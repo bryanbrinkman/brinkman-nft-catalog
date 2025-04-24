@@ -19,7 +19,10 @@ import {
   Stack,
   IconButton,
   Tooltip,
-  Divider
+  Divider,
+  Link,
+  List,
+  ListItem
 } from '@mui/material';
 import { 
   Sort as SortIcon, 
@@ -30,20 +33,21 @@ import {
 import Papa from 'papaparse';
 
 interface NFT {
-  Type: string;
+  'Artwork Title': string;
+  'Type': string;
   'Edt Size': string;
   'Mint Date': string;
-  Platform: string;
+  'Platform': string;
   'Collection Name': string;
   'Collaborator/Special Type': string;
-  Link: string;
+  'Link': string;
   'Contract Hash': string;
   'Token Type': string;
   'TokenID Start': string;
   'Token ID End': string;
   'IPFS Image': string;
   'IPFS Json': string;
-  Pinned: string;
+  'Pinned?': string;
   'Hosting Type': string;
 }
 
@@ -68,7 +72,7 @@ function App() {
 
   useEffect(() => {
     // Load CSV data
-    fetch('/Brinkman NFT Catalog - Sheet1 (4).csv')
+    fetch('./Brinkman NFT Catalog - Sheet1 (4).csv')
       .then(response => response.text())
       .then(data => {
         Papa.parse(data, {
@@ -88,6 +92,7 @@ function App() {
     // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(nft => 
+        nft['Artwork Title']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         nft['Collection Name']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         nft.Platform?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         nft.Type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -138,7 +143,9 @@ function App() {
 
   const getImageUrl = (nft: NFT) => {
     if (nft['IPFS Image']) {
-      return `https://ipfs.io/ipfs/${nft['IPFS Image']}`;
+      // Remove any leading/trailing whitespace and ensure proper IPFS gateway URL
+      const ipfsHash = nft['IPFS Image'].trim();
+      return `https://ipfs.io/ipfs/${ipfsHash}`;
     }
     return 'https://via.placeholder.com/300x300?text=No+Image';
   };
@@ -178,7 +185,7 @@ function App() {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Container maxWidth="xl" sx={{ py: 4, bgcolor: 'white' }}>
       <Box sx={{ mb: 4 }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} md={6}>
@@ -219,7 +226,7 @@ function App() {
         </Grid>
 
         {showFilters && (
-          <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+          <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 1, boxShadow: 1 }}>
             <Grid container spacing={2}>
               <Grid item xs={12} md={3}>
                 <FormControl fullWidth>
@@ -321,103 +328,119 @@ function App() {
       </Box>
 
       {viewMode === 'grid' ? (
-        <Grid container spacing={3}>
-          {paginatedNfts.map((nft, index) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={index}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <CardMedia
-                  component="img"
-                  height="200"
-                  image={getImageUrl(nft)}
-                  alt={nft['Collection Name'] || 'NFT'}
-                  sx={{ objectFit: 'cover' }}
-                />
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Typography gutterBottom variant="h6" component="div">
-                    {nft['Collection Name'] || 'Untitled'}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Platform: {nft.Platform}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Type: {nft.Type}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Mint Date: {nft['Mint Date']}
-                  </Typography>
-                  {nft['Collaborator/Special Type'] && (
-                    <Typography variant="body2" color="text.secondary">
-                      Collaborator: {nft['Collaborator/Special Type']}
-                    </Typography>
-                  )}
-                  {nft.Link && (
-                    <Typography variant="body2" color="primary" sx={{ mt: 1 }}>
-                      <a href={nft.Link} target="_blank" rel="noopener noreferrer">
-                        View on Platform
-                      </a>
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
+        <Box sx={{ width: '100%', overflowX: 'auto', bgcolor: 'white' }}>
+          <Box sx={{ minWidth: 800 }}>
+            {/* Header Row */}
+            <Grid container sx={{ 
+              py: 1, 
+              borderBottom: 1, 
+              borderColor: 'divider',
+              bgcolor: 'white',
+              position: 'sticky',
+              top: 0,
+              zIndex: 1
+            }}>
+              <Grid item xs={1}>
+                <Typography variant="subtitle2" color="black">Image</Typography>
+              </Grid>
+              <Grid item xs={3}>
+                <Typography variant="subtitle2" color="black">Title</Typography>
+              </Grid>
+              <Grid item xs={2}>
+                <Typography variant="subtitle2" color="black">Date</Typography>
+              </Grid>
+              <Grid item xs={2}>
+                <Typography variant="subtitle2" color="black">Type</Typography>
+              </Grid>
+              <Grid item xs={2}>
+                <Typography variant="subtitle2" color="black">Edition Size</Typography>
+              </Grid>
+              <Grid item xs={2}>
+                <Typography variant="subtitle2" color="black">Link</Typography>
+              </Grid>
             </Grid>
-          ))}
-        </Grid>
-      ) : (
-        <Box>
-          {paginatedNfts.map((nft, index) => (
-            <Card key={index} sx={{ mb: 2 }}>
-              <Grid container>
-                <Grid item xs={12} md={3}>
-                  <CardMedia
-                    component="img"
-                    height="200"
-                    image={getImageUrl(nft)}
-                    alt={nft['Collection Name'] || 'NFT'}
-                    sx={{ objectFit: 'cover', height: '100%' }}
-                  />
+            
+            {/* Data Rows */}
+            {paginatedNfts.map((nft, index) => (
+              <Grid container key={index} sx={{ 
+                py: 1, 
+                borderBottom: 1, 
+                borderColor: 'divider',
+                bgcolor: 'white',
+                '&:hover': { bgcolor: 'grey.100' }
+              }}>
+                <Grid item xs={1}>
+                  <Box sx={{ width: 60, height: 60 }}>
+                    <img
+                      src={getImageUrl(nft)}
+                      alt={nft['Collection Name'] || nft.Type || 'NFT'}
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'cover',
+                        borderRadius: '4px'
+                      }}
+                    />
+                  </Box>
                 </Grid>
-                <Grid item xs={12} md={9}>
-                  <CardContent>
-                    <Typography variant="h6" component="div">
-                      {nft['Collection Name'] || 'Untitled'}
-                    </Typography>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Platform: {nft.Platform}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Type: {nft.Type}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Mint Date: {nft['Mint Date']}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        {nft['Collaborator/Special Type'] && (
-                          <Typography variant="body2" color="text.secondary">
-                            Collaborator: {nft['Collaborator/Special Type']}
-                          </Typography>
-                        )}
-                      </Grid>
-                    </Grid>
-                    {nft.Link && (
-                      <Typography variant="body2" color="primary" sx={{ mt: 1 }}>
-                        <a href={nft.Link} target="_blank" rel="noopener noreferrer">
-                          View on Platform
-                        </a>
+                <Grid item xs={3} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="body1" color="black">
+                    {nft['Artwork Title'] || 'Untitled'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="body2" color="black">
+                    {nft['Mint Date']}
+                  </Typography>
+                </Grid>
+                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="body2" color="black">
+                    {nft.Type}
+                  </Typography>
+                </Grid>
+                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="body2" color="black">
+                    {nft['Edt Size']}
+                  </Typography>
+                </Grid>
+                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                  {nft.Link && (
+                    <Link href={nft.Link} target="_blank" rel="noopener noreferrer">
+                      <Typography variant="body2" color="primary">
+                        View
                       </Typography>
-                    )}
-                  </CardContent>
+                    </Link>
+                  )}
                 </Grid>
               </Grid>
-            </Card>
-          ))}
+            ))}
+          </Box>
         </Box>
+      ) : (
+        <List>
+          {filteredNfts.slice((page - 1) * itemsPerPage, page * itemsPerPage).map((nft, index) => (
+            <ListItem key={index} divider>
+              <Grid container alignItems="center">
+                <Grid item xs={2}>
+                  <img 
+                    src={getImageUrl(nft)} 
+                    alt={nft['Artwork Title']} 
+                    style={{ width: '100%', height: 'auto' }} 
+                  />
+                </Grid>
+                <Grid item xs={3}>{nft['Artwork Title']}</Grid>
+                <Grid item xs={2}>{nft['Mint Date']}</Grid>
+                <Grid item xs={2}>{nft['Type']}</Grid>
+                <Grid item xs={2}>{nft['Edt Size']}</Grid>
+                <Grid item xs={1}>
+                  <Link href={nft['Link']} target="_blank" rel="noopener noreferrer">
+                    View
+                  </Link>
+                </Grid>
+              </Grid>
+            </ListItem>
+          ))}
+        </List>
       )}
 
       {pageCount > 1 && (
