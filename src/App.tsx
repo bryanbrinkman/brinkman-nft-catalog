@@ -151,9 +151,15 @@ function App() {
   const collaborators = [...new Set(nfts.map(nft => nft['Collaborator/Special Type']))].filter(Boolean);
 
   const getImageUrl = async (nft: NFT): Promise<string> => {
+    // Helper function to delay between API calls
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
     // First try OpenSea API if we have contract and token info
     if (nft['Contract Hash'] && nft['TokenID Start']) {
       try {
+        // Add a small delay to avoid rate limiting
+        await delay(100);
+        
         const response = await fetch(
           `https://api.opensea.io/api/v2/chain/ethereum/contract/${nft['Contract Hash']}/nfts/${nft['TokenID Start']}`,
           {
@@ -167,30 +173,73 @@ function App() {
         if (response.ok) {
           const data = await response.json();
           if (data.nft && data.nft.image_url) {
+            console.log('OpenSea image found for:', nft['Artwork Title']);
             return data.nft.image_url;
           }
+        } else {
+          console.warn('OpenSea API error for:', nft['Artwork Title'], await response.text());
         }
       } catch (error) {
-        console.error('Error fetching from OpenSea:', error);
+        console.error('Error fetching from OpenSea for:', nft['Artwork Title'], error);
       }
     }
 
-    // If OpenSea fails or isn't available, try IPFS
+    // Try IPFS if available
     if (nft['IPFS Image']) {
-      const ipfsHash = nft['IPFS Image'].trim();
-      const gateways = [
-        'https://ipfs.io/ipfs/',
-        'https://cloudflare-ipfs.com/ipfs/',
-        'https://gateway.pinata.cloud/ipfs/',
-        'https://dweb.link/ipfs/',
-        'https://gateway.ipfs.io/ipfs/'
-      ];
-      
-      // Use a random gateway to distribute the load
-      const gateway = gateways[Math.floor(Math.random() * gateways.length)];
-      return `${gateway}${ipfsHash}`;
+      try {
+        const ipfsHash = nft['IPFS Image'].trim();
+        // Remove 'ipfs://' if present
+        const cleanHash = ipfsHash.replace('ipfs://', '');
+        
+        const gateways = [
+          'https://nftstorage.link/ipfs/',
+          'https://cloudflare-ipfs.com/ipfs/',
+          'https://ipfs.io/ipfs/',
+          'https://gateway.pinata.cloud/ipfs/',
+          'https://dweb.link/ipfs/',
+          'https://gateway.ipfs.io/ipfs/'
+        ];
+
+        // Try each gateway in sequence until one works
+        for (const gateway of gateways) {
+          try {
+            const url = `${gateway}${cleanHash}`;
+            // Test if the image is accessible
+            const response = await fetch(url, { method: 'HEAD' });
+            if (response.ok) {
+              console.log('IPFS image found at', gateway, 'for:', nft['Artwork Title']);
+              return url;
+            }
+          } catch (error) {
+            console.warn('Failed to load from gateway:', gateway, 'for:', nft['Artwork Title']);
+            continue;
+          }
+        }
+      } catch (error) {
+        console.error('Error processing IPFS image for:', nft['Artwork Title'], error);
+      }
     }
 
+    // If we have a Link field that points to an image, try that
+    if (nft.Link && (
+      nft.Link.endsWith('.jpg') || 
+      nft.Link.endsWith('.jpeg') || 
+      nft.Link.endsWith('.png') || 
+      nft.Link.endsWith('.gif') ||
+      nft.Link.includes('opensea.io/assets')
+    )) {
+      try {
+        const response = await fetch(nft.Link, { method: 'HEAD' });
+        if (response.ok) {
+          console.log('Direct link image found for:', nft['Artwork Title']);
+          return nft.Link;
+        }
+      } catch (error) {
+        console.error('Error fetching from direct link for:', nft['Artwork Title'], error);
+      }
+    }
+
+    console.warn('No valid image found for:', nft['Artwork Title']);
     return 'https://via.placeholder.com/300x300?text=No+Image';
   };
 
@@ -201,26 +250,42 @@ function App() {
     const maxRetries = 3;
     
     useEffect(() => {
+      let isMounted = true;
+      
       const loadImage = async () => {
         try {
           const imageUrl = await getImageUrl(nft);
-          setCurrentSrc(imageUrl);
+          if (isMounted) {
+            setCurrentSrc(imageUrl);
+          }
         } catch (error) {
-          console.error('Error loading image:', error);
-          setCurrentSrc('https://via.placeholder.com/300x300?text=Error+Loading+Image');
+          console.error('Error loading image for:', nft['Artwork Title'], error);
+          if (isMounted) {
+            setCurrentSrc('https://via.placeholder.com/300x300?text=Error+Loading+Image');
+          }
         }
       };
       
       loadImage();
+      
+      return () => {
+        isMounted = false;
+      };
     }, [nft]);
 
     const handleError = async () => {
+      console.warn('Image load error for:', nft['Artwork Title'], 'attempt:', errorCount + 1);
       if (errorCount < maxRetries) {
         setErrorCount(prev => prev + 1);
-        // Try getting a new URL on error
-        const newUrl = await getImageUrl(nft);
-        setCurrentSrc(newUrl);
+        try {
+          const newUrl = await getImageUrl(nft);
+          setCurrentSrc(newUrl);
+        } catch (error) {
+          console.error('Error in retry for:', nft['Artwork Title'], error);
+          setCurrentSrc('https://via.placeholder.com/300x300?text=Image+Not+Available');
+        }
       } else {
+        console.error('Max retries reached for:', nft['Artwork Title']);
         setCurrentSrc('https://via.placeholder.com/300x300?text=Image+Not+Available');
       }
     };
