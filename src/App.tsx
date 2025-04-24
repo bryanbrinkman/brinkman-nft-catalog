@@ -49,9 +49,10 @@ interface NFT {
   'IPFS Json': string;
   'Pinned?': string;
   'Hosting Type': string;
+  'Price'?: string; // Optional price field
 }
 
-type SortField = 'Artwork Title' | 'Mint Date' | 'Type' | 'Edt Size' | 'Platform' | 'Collaborator/Special Type';
+type SortField = 'Artwork Title' | 'Mint Date' | 'Type' | 'Edt Size' | 'Platform' | 'Collaborator/Special Type' | 'Price';
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'grid' | 'list';
 
@@ -216,6 +217,63 @@ function App() {
     setSortField('Mint Date');
     setSortOrder('desc');
   };
+
+  // Add price fetching function
+  const fetchOpenSeaPrice = async (contractAddress: string, tokenId: string): Promise<string> => {
+    try {
+      const response = await fetch(
+        `https://api.opensea.io/api/v2/chain/ethereum/contract/${contractAddress}/nfts/${tokenId}/listings`,
+        {
+          headers: {
+            'X-API-KEY': process.env.REACT_APP_OPENSEA_API_KEY || '', // API key should be in .env file
+            'Accept': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('OpenSea API error:', await response.text());
+        return 'N/A';
+      }
+
+      const data = await response.json();
+      if (data.listings && data.listings.length > 0) {
+        // Get the lowest price listing
+        const lowestPriceListing = data.listings.reduce((lowest: any, current: any) => {
+          const currentPrice = parseFloat(current.price.current.value);
+          return !lowest || currentPrice < parseFloat(lowest.price.current.value) ? current : lowest;
+        }, null);
+
+        if (lowestPriceListing) {
+          return `${lowestPriceListing.price.current.value} ${lowestPriceListing.price.current.currency}`;
+        }
+      }
+      return 'Not Listed';
+    } catch (error) {
+      console.error('Error fetching OpenSea price:', error);
+      return 'N/A';
+    }
+  };
+
+  // Add useEffect to fetch prices
+  useEffect(() => {
+    const fetchPrices = async () => {
+      const updatedNfts = await Promise.all(
+        nfts.map(async (nft) => {
+          if (nft['Contract Hash'] && nft['TokenID Start']) {
+            const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start']);
+            return { ...nft, Price: price };
+          }
+          return { ...nft, Price: 'N/A' };
+        })
+      );
+      setNfts(updatedNfts);
+    };
+
+    if (nfts.length > 0) {
+      fetchPrices();
+    }
+  }, [nfts.length]); // Only run when nfts array length changes
 
   if (loading) {
     return (
@@ -543,6 +601,21 @@ function App() {
                   </Typography>
                 </Box>
               </Grid>
+              <Grid item xs={2}>
+                <Box 
+                  onClick={() => handleColumnClick('Price')}
+                  sx={{ 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
+                    Price {getSortIcon('Price')}
+                  </Typography>
+                </Box>
+              </Grid>
               <Grid item xs={1}>
                 <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Link</Typography>
               </Grid>
@@ -601,6 +674,11 @@ function App() {
                     {nft['Collaborator/Special Type']}
                   </Typography>
                 </Grid>
+                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
+                    {nft.Price || 'N/A'}
+                  </Typography>
+                </Grid>
                 <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                   {nft.Link && (
                     <Link 
@@ -651,6 +729,9 @@ function App() {
                 </Grid>
                 <Grid item xs={2}>
                   <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Collaborator/Special Type']}</Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft.Price || 'N/A'}</Typography>
                 </Grid>
                 <Grid item xs={1}>
                   <Link 
