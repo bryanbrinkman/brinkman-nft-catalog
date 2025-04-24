@@ -77,6 +77,10 @@ function App() {
       .then(data => {
         Papa.parse(data, {
           header: true,
+          transformHeader: (header, index) => {
+            // The first column has no header, so we'll name it 'Artwork Title'
+            return header || 'Artwork Title';
+          },
           complete: (results) => {
             setNfts(results.data as NFT[]);
             setFilteredNfts(results.data as NFT[]);
