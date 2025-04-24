@@ -185,7 +185,7 @@ function App() {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4, bgcolor: 'white' }}>
+    <Container maxWidth="xl" sx={{ py: 4, bgcolor: '#f5f5f5' }}>
       <Box sx={{ mb: 4 }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} md={6}>
@@ -199,18 +199,21 @@ function App() {
               sx={{
                 '& .MuiOutlinedInput-root': {
                   '& fieldset': {
-                    borderColor: 'grey.300',
+                    borderColor: 'rgba(0, 0, 0, 0.23)',
                   },
                   '&:hover fieldset': {
-                    borderColor: 'grey.400',
+                    borderColor: 'rgba(0, 0, 0, 0.87)',
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: 'primary.main',
+                    borderColor: '#1976d2',
                   },
-                  backgroundColor: 'grey.50',
+                  backgroundColor: '#ffffff',
                 },
                 '& .MuiInputLabel-root': {
-                  color: 'grey.600',
+                  color: 'rgba(0, 0, 0, 0.87)',
+                },
+                '& .MuiInputBase-input': {
+                  color: 'rgba(0, 0, 0, 0.87)',
                 },
               }}
             />
@@ -218,14 +221,17 @@ function App() {
           <Grid item xs={12} md={6}>
             <Box display="flex" justifyContent="flex-end" gap={1}>
               <Tooltip title="Toggle Filters">
-                <IconButton onClick={() => setShowFilters(!showFilters)} color="primary">
+                <IconButton 
+                  onClick={() => setShowFilters(!showFilters)} 
+                  sx={{ color: 'rgba(0, 0, 0, 0.87)' }}
+                >
                   <FilterIcon />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Grid View">
                 <IconButton 
                   onClick={() => setViewMode('grid')} 
-                  color={viewMode === 'grid' ? 'primary' : 'default'}
+                  sx={{ color: viewMode === 'grid' ? '#1976d2' : 'rgba(0, 0, 0, 0.87)' }}
                 >
                   <GridIcon />
                 </IconButton>
@@ -233,7 +239,7 @@ function App() {
               <Tooltip title="List View">
                 <IconButton 
                   onClick={() => setViewMode('list')} 
-                  color={viewMode === 'list' ? 'primary' : 'default'}
+                  sx={{ color: viewMode === 'list' ? '#1976d2' : 'rgba(0, 0, 0, 0.87)' }}
                 >
                   <ListIcon />
                 </IconButton>
@@ -243,15 +249,21 @@ function App() {
         </Grid>
 
         {showFilters && (
-          <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 1, boxShadow: 1 }}>
+          <Box sx={{ mt: 2, p: 2, bgcolor: '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
             <Grid container spacing={2}>
               <Grid item xs={12} md={3}>
                 <FormControl fullWidth>
-                  <InputLabel>Platform</InputLabel>
+                  <InputLabel sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>Platform</InputLabel>
                   <Select
                     value={platformFilter}
                     label="Platform"
                     onChange={(e) => setPlatformFilter(e.target.value)}
+                    sx={{ 
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(0, 0, 0, 0.23)',
+                      },
+                    }}
                   >
                     <MenuItem value="">All Platforms</MenuItem>
                     {platforms.map((platform) => (
@@ -264,11 +276,17 @@ function App() {
               </Grid>
               <Grid item xs={12} md={3}>
                 <FormControl fullWidth>
-                  <InputLabel>Type</InputLabel>
+                  <InputLabel sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>Type</InputLabel>
                   <Select
                     value={typeFilter}
                     label="Type"
                     onChange={(e) => setTypeFilter(e.target.value)}
+                    sx={{ 
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(0, 0, 0, 0.23)',
+                      },
+                    }}
                   >
                     <MenuItem value="">All Types</MenuItem>
                     {types.map((type) => (
@@ -281,11 +299,17 @@ function App() {
               </Grid>
               <Grid item xs={12} md={3}>
                 <FormControl fullWidth>
-                  <InputLabel>Collaborator</InputLabel>
+                  <InputLabel sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>Collaborator</InputLabel>
                   <Select
                     value={collaboratorFilter}
                     label="Collaborator"
                     onChange={(e) => setCollaboratorFilter(e.target.value)}
+                    sx={{ 
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(0, 0, 0, 0.23)',
+                      },
+                    }}
                   >
                     <MenuItem value="">All Collaborators</MenuItem>
                     {collaborators.map((collaborator) => (
@@ -312,32 +336,60 @@ function App() {
         )}
 
         <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
             Showing {filteredNfts.length} NFTs
           </Typography>
           <Stack direction="row" spacing={1}>
             <Chip 
               label="Unique" 
               onClick={() => setTypeFilter(typeFilter === 'Unique' ? '' : 'Unique')}
-              color={typeFilter === 'Unique' ? 'primary' : 'default'}
+              sx={{
+                color: typeFilter === 'Unique' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
+                backgroundColor: typeFilter === 'Unique' ? '#1976d2' : '#ffffff',
+                borderColor: 'rgba(0, 0, 0, 0.23)',
+                '&:hover': {
+                  backgroundColor: typeFilter === 'Unique' ? '#1565c0' : '#f5f5f5',
+                },
+              }}
               variant={typeFilter === 'Unique' ? 'filled' : 'outlined'}
             />
             <Chip 
               label="Editions" 
               onClick={() => setTypeFilter(typeFilter === 'Editions' ? '' : 'Editions')}
-              color={typeFilter === 'Editions' ? 'primary' : 'default'}
+              sx={{
+                color: typeFilter === 'Editions' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
+                backgroundColor: typeFilter === 'Editions' ? '#1976d2' : '#ffffff',
+                borderColor: 'rgba(0, 0, 0, 0.23)',
+                '&:hover': {
+                  backgroundColor: typeFilter === 'Editions' ? '#1565c0' : '#f5f5f5',
+                },
+              }}
               variant={typeFilter === 'Editions' ? 'filled' : 'outlined'}
             />
             <Chip 
               label="Generative" 
               onClick={() => setTypeFilter(typeFilter === 'Generative' ? '' : 'Generative')}
-              color={typeFilter === 'Generative' ? 'primary' : 'default'}
+              sx={{
+                color: typeFilter === 'Generative' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
+                backgroundColor: typeFilter === 'Generative' ? '#1976d2' : '#ffffff',
+                borderColor: 'rgba(0, 0, 0, 0.23)',
+                '&:hover': {
+                  backgroundColor: typeFilter === 'Generative' ? '#1565c0' : '#f5f5f5',
+                },
+              }}
               variant={typeFilter === 'Generative' ? 'filled' : 'outlined'}
             />
             <Chip 
               label="Series" 
               onClick={() => setTypeFilter(typeFilter === 'Series' ? '' : 'Series')}
-              color={typeFilter === 'Series' ? 'primary' : 'default'}
+              sx={{
+                color: typeFilter === 'Series' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
+                backgroundColor: typeFilter === 'Series' ? '#1976d2' : '#ffffff',
+                borderColor: 'rgba(0, 0, 0, 0.23)',
+                '&:hover': {
+                  backgroundColor: typeFilter === 'Series' ? '#1565c0' : '#f5f5f5',
+                },
+              }}
               variant={typeFilter === 'Series' ? 'filled' : 'outlined'}
             />
           </Stack>
@@ -345,35 +397,35 @@ function App() {
       </Box>
 
       {viewMode === 'grid' ? (
-        <Box sx={{ width: '100%', overflowX: 'auto', bgcolor: 'white' }}>
+        <Box sx={{ width: '100%', overflowX: 'auto', bgcolor: '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
           <Box sx={{ minWidth: 800 }}>
             {/* Header Row */}
             <Grid container sx={{ 
               py: 1, 
               borderBottom: 1, 
-              borderColor: 'divider',
-              bgcolor: 'white',
+              borderColor: 'rgba(0, 0, 0, 0.12)',
+              bgcolor: '#ffffff',
               position: 'sticky',
               top: 0,
               zIndex: 1
             }}>
               <Grid item xs={1}>
-                <Typography variant="subtitle2" color="black">Image</Typography>
+                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Image</Typography>
               </Grid>
               <Grid item xs={3}>
-                <Typography variant="subtitle2" color="black">Title</Typography>
+                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Title</Typography>
               </Grid>
               <Grid item xs={2}>
-                <Typography variant="subtitle2" color="black">Date</Typography>
+                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Date</Typography>
               </Grid>
               <Grid item xs={2}>
-                <Typography variant="subtitle2" color="black">Type</Typography>
+                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Type</Typography>
               </Grid>
               <Grid item xs={2}>
-                <Typography variant="subtitle2" color="black">Edition Size</Typography>
+                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Edition Size</Typography>
               </Grid>
               <Grid item xs={2}>
-                <Typography variant="subtitle2" color="black">Link</Typography>
+                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Link</Typography>
               </Grid>
             </Grid>
             
@@ -382,9 +434,9 @@ function App() {
               <Grid container key={index} sx={{ 
                 py: 1, 
                 borderBottom: 1, 
-                borderColor: 'divider',
-                bgcolor: 'white',
-                '&:hover': { bgcolor: 'grey.100' }
+                borderColor: 'rgba(0, 0, 0, 0.12)',
+                bgcolor: '#ffffff',
+                '&:hover': { bgcolor: '#f5f5f5' }
               }}>
                 <Grid item xs={1}>
                   <Box sx={{ width: 60, height: 60 }}>
@@ -401,31 +453,39 @@ function App() {
                   </Box>
                 </Grid>
                 <Grid item xs={3} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body1" color="black">
+                  <Typography variant="body1" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft['Artwork Title'] || 'Untitled'}
                   </Typography>
                 </Grid>
                 <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" color="black">
+                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft['Mint Date']}
                   </Typography>
                 </Grid>
                 <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" color="black">
+                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft.Type}
                   </Typography>
                 </Grid>
                 <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" color="black">
+                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft['Edt Size']}
                   </Typography>
                 </Grid>
                 <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
                   {nft.Link && (
-                    <Link href={nft.Link} target="_blank" rel="noopener noreferrer">
-                      <Typography variant="body2" color="primary">
-                        View
-                      </Typography>
+                    <Link 
+                      href={nft.Link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      sx={{ 
+                        color: '#1976d2',
+                        '&:hover': {
+                          color: '#1565c0',
+                        },
+                      }}
+                    >
+                      View
                     </Link>
                   )}
                 </Grid>
@@ -434,9 +494,9 @@ function App() {
           </Box>
         </Box>
       ) : (
-        <List>
+        <List sx={{ bgcolor: '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
           {filteredNfts.slice((page - 1) * itemsPerPage, page * itemsPerPage).map((nft, index) => (
-            <ListItem key={index} divider>
+            <ListItem key={index} divider sx={{ borderColor: 'rgba(0, 0, 0, 0.12)' }}>
               <Grid container alignItems="center">
                 <Grid item xs={2}>
                   <img 
@@ -445,12 +505,30 @@ function App() {
                     style={{ width: '100%', height: 'auto' }} 
                   />
                 </Grid>
-                <Grid item xs={3}>{nft['Artwork Title']}</Grid>
-                <Grid item xs={2}>{nft['Mint Date']}</Grid>
-                <Grid item xs={2}>{nft['Type']}</Grid>
-                <Grid item xs={2}>{nft['Edt Size']}</Grid>
+                <Grid item xs={3}>
+                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Artwork Title']}</Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Mint Date']}</Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Type']}</Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Edt Size']}</Typography>
+                </Grid>
                 <Grid item xs={1}>
-                  <Link href={nft['Link']} target="_blank" rel="noopener noreferrer">
+                  <Link 
+                    href={nft['Link']} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    sx={{ 
+                      color: '#1976d2',
+                      '&:hover': {
+                        color: '#1565c0',
+                      },
+                    }}
+                  >
                     View
                   </Link>
                 </Grid>
@@ -466,7 +544,15 @@ function App() {
             count={pageCount} 
             page={page} 
             onChange={handlePageChange} 
-            color="primary" 
+            sx={{
+              '& .MuiPaginationItem-root': {
+                color: 'rgba(0, 0, 0, 0.87)',
+              },
+              '& .Mui-selected': {
+                backgroundColor: '#1976d2 !important',
+                color: '#ffffff',
+              },
+            }}
           />
         </Box>
       )}
