@@ -358,17 +358,17 @@ function App() {
               variant={typeFilter === 'Unique' ? 'filled' : 'outlined'}
             />
             <Chip 
-              label="Editions" 
-              onClick={() => setTypeFilter(typeFilter === 'Editions' ? '' : 'Editions')}
+              label="Edition" 
+              onClick={() => setTypeFilter(typeFilter === 'Edition' ? '' : 'Edition')}
               sx={{
-                color: typeFilter === 'Editions' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
-                backgroundColor: typeFilter === 'Editions' ? '#1976d2' : '#ffffff',
+                color: typeFilter === 'Edition' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
+                backgroundColor: typeFilter === 'Edition' ? '#1976d2' : '#ffffff',
                 borderColor: 'rgba(0, 0, 0, 0.23)',
                 '&:hover': {
-                  backgroundColor: typeFilter === 'Editions' ? '#1565c0' : '#f5f5f5',
+                  backgroundColor: typeFilter === 'Edition' ? '#1565c0' : '#f5f5f5',
                 },
               }}
-              variant={typeFilter === 'Editions' ? 'filled' : 'outlined'}
+              variant={typeFilter === 'Edition' ? 'filled' : 'outlined'}
             />
             <Chip 
               label="Generative" 
