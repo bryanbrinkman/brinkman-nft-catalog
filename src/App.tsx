@@ -151,11 +151,47 @@ function App() {
 
   const getImageUrl = (nft: NFT) => {
     if (nft['IPFS Image']) {
-      // Remove any leading/trailing whitespace and ensure proper IPFS gateway URL
+      // Remove any leading/trailing whitespace
       const ipfsHash = nft['IPFS Image'].trim();
-      return `https://ipfs.io/ipfs/${ipfsHash}`;
+      
+      // List of IPFS gateways to try
+      const gateways = [
+        'https://ipfs.io/ipfs/',
+        'https://cloudflare-ipfs.com/ipfs/',
+        'https://gateway.pinata.cloud/ipfs/',
+        'https://dweb.link/ipfs/'
+      ];
+      
+      // Use a random gateway to distribute the load
+      const gateway = gateways[Math.floor(Math.random() * gateways.length)];
+      return `${gateway}${ipfsHash}`;
     }
     return 'https://via.placeholder.com/300x300?text=No+Image';
+  };
+
+  // Add an image error handler component
+  const ImageWithFallback = ({ src, alt, style }: { src: string, alt: string, style: React.CSSProperties }) => {
+    const [currentSrc, setCurrentSrc] = useState(src);
+    const [errorCount, setErrorCount] = useState(0);
+    
+    const handleError = () => {
+      if (errorCount < 3) { // Try up to 3 different gateways
+        setErrorCount(prev => prev + 1);
+        setCurrentSrc(getImageUrl({ ...nfts[0], 'IPFS Image': src.split('/ipfs/')[1] }));
+      } else {
+        // If all gateways fail, show placeholder
+        setCurrentSrc('https://via.placeholder.com/300x300?text=Image+Not+Available');
+      }
+    };
+
+    return (
+      <img
+        src={currentSrc}
+        alt={alt}
+        style={style}
+        onError={handleError}
+      />
+    );
   };
 
   const handleColumnClick = (field: SortField) => {
@@ -493,7 +529,7 @@ function App() {
               }}>
                 <Grid item xs={1}>
                   <Box sx={{ width: 60, height: 60 }}>
-                    <img
+                    <ImageWithFallback
                       src={getImageUrl(nft)}
                       alt={nft['Collection Name'] || nft.Type || 'NFT'}
                       style={{ 
@@ -552,10 +588,10 @@ function App() {
             <ListItem key={index} divider sx={{ borderColor: 'rgba(0, 0, 0, 0.12)' }}>
               <Grid container alignItems="center">
                 <Grid item xs={2}>
-                  <img 
-                    src={getImageUrl(nft)} 
-                    alt={nft['Artwork Title']} 
-                    style={{ width: '100%', height: 'auto' }} 
+                  <ImageWithFallback
+                    src={getImageUrl(nft)}
+                    alt={nft['Artwork Title']}
+                    style={{ width: '100%', height: 'auto' }}
                   />
                 </Grid>
                 <Grid item xs={3}>
