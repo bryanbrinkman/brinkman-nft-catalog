@@ -196,6 +196,23 @@ function App() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by name, platform, type, or collaborator"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': {
+                    borderColor: 'grey.300',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'grey.400',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: 'primary.main',
+                  },
+                  backgroundColor: 'grey.50',
+                },
+                '& .MuiInputLabel-root': {
+                  color: 'grey.600',
+                },
+              }}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -300,28 +317,28 @@ function App() {
           </Typography>
           <Stack direction="row" spacing={1}>
             <Chip 
-              label={`Sort: ${sortField}`} 
-              icon={<SortIcon />} 
-              onClick={() => handleSortChange('Collection Name')}
-              color={sortField === 'Collection Name' ? 'primary' : 'default'}
+              label="Unique" 
+              onClick={() => setTypeFilter(typeFilter === 'Unique' ? '' : 'Unique')}
+              color={typeFilter === 'Unique' ? 'primary' : 'default'}
+              variant={typeFilter === 'Unique' ? 'filled' : 'outlined'}
             />
             <Chip 
-              label={`Sort: ${sortField}`} 
-              icon={<SortIcon />} 
-              onClick={() => handleSortChange('Mint Date')}
-              color={sortField === 'Mint Date' ? 'primary' : 'default'}
+              label="Editions" 
+              onClick={() => setTypeFilter(typeFilter === 'Editions' ? '' : 'Editions')}
+              color={typeFilter === 'Editions' ? 'primary' : 'default'}
+              variant={typeFilter === 'Editions' ? 'filled' : 'outlined'}
             />
             <Chip 
-              label={`Sort: ${sortField}`} 
-              icon={<SortIcon />} 
-              onClick={() => handleSortChange('Platform')}
-              color={sortField === 'Platform' ? 'primary' : 'default'}
+              label="Generative" 
+              onClick={() => setTypeFilter(typeFilter === 'Generative' ? '' : 'Generative')}
+              color={typeFilter === 'Generative' ? 'primary' : 'default'}
+              variant={typeFilter === 'Generative' ? 'filled' : 'outlined'}
             />
             <Chip 
-              label={`Sort: ${sortField}`} 
-              icon={<SortIcon />} 
-              onClick={() => handleSortChange('Type')}
-              color={sortField === 'Type' ? 'primary' : 'default'}
+              label="Series" 
+              onClick={() => setTypeFilter(typeFilter === 'Series' ? '' : 'Series')}
+              color={typeFilter === 'Series' ? 'primary' : 'default'}
+              variant={typeFilter === 'Series' ? 'filled' : 'outlined'}
             />
           </Stack>
         </Box>
