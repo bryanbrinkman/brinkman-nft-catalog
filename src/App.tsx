@@ -51,7 +51,7 @@ interface NFT {
   'Hosting Type': string;
 }
 
-type SortField = 'Collection Name' | 'Mint Date' | 'Platform' | 'Type';
+type SortField = 'Artwork Title' | 'Mint Date' | 'Type' | 'Edt Size';
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'grid' | 'list';
 
@@ -63,8 +63,6 @@ function App() {
   const [typeFilter, setTypeFilter] = useState('');
   const [collaboratorFilter, setCollaboratorFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [itemsPerPage] = useState(12);
   const [sortField, setSortField] = useState<SortField>('Mint Date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -130,6 +128,13 @@ function App() {
         const bDate = new Date(bValue).getTime();
         return sortOrder === 'asc' ? aDate - bDate : bDate - aDate;
       }
+
+      if (sortField === 'Edt Size') {
+        // Convert edition sizes to numbers for proper sorting
+        const aNum = parseInt(aValue) || 0;
+        const bNum = parseInt(bValue) || 0;
+        return sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+      }
       
       // String comparison for other fields
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
@@ -138,7 +143,6 @@ function App() {
     });
 
     setFilteredNfts(filtered);
-    setPage(1); // Reset to first page when filters change
   }, [searchTerm, platformFilter, typeFilter, collaboratorFilter, nfts, sortField, sortOrder]);
 
   const platforms = [...new Set(nfts.map(nft => nft.Platform))].filter(Boolean);
@@ -154,7 +158,7 @@ function App() {
     return 'https://via.placeholder.com/300x300?text=No+Image';
   };
 
-  const handleSortChange = (field: SortField) => {
+  const handleColumnClick = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -163,13 +167,10 @@ function App() {
     }
   };
 
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
-    setPage(value);
-    window.scrollTo(0, 0);
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return '↕️';
+    return sortOrder === 'asc' ? '↑' : '↓';
   };
-
-  const paginatedNfts = filteredNfts.slice((page - 1) * itemsPerPage, page * itemsPerPage);
-  const pageCount = Math.ceil(filteredNfts.length / itemsPerPage);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -417,16 +418,64 @@ function App() {
                 <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Image</Typography>
               </Grid>
               <Grid item xs={3}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Title</Typography>
+                <Box 
+                  onClick={() => handleColumnClick('Artwork Title')}
+                  sx={{ 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
+                    Title {getSortIcon('Artwork Title')}
+                  </Typography>
+                </Box>
               </Grid>
               <Grid item xs={2}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Date</Typography>
+                <Box 
+                  onClick={() => handleColumnClick('Mint Date')}
+                  sx={{ 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
+                    Date {getSortIcon('Mint Date')}
+                  </Typography>
+                </Box>
               </Grid>
               <Grid item xs={2}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Type</Typography>
+                <Box 
+                  onClick={() => handleColumnClick('Type')}
+                  sx={{ 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
+                    Type {getSortIcon('Type')}
+                  </Typography>
+                </Box>
               </Grid>
               <Grid item xs={2}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Edition Size</Typography>
+                <Box 
+                  onClick={() => handleColumnClick('Edt Size')}
+                  sx={{ 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
+                    Edition Size {getSortIcon('Edt Size')}
+                  </Typography>
+                </Box>
               </Grid>
               <Grid item xs={2}>
                 <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Link</Typography>
@@ -434,7 +483,7 @@ function App() {
             </Grid>
             
             {/* Data Rows */}
-            {paginatedNfts.map((nft, index) => (
+            {filteredNfts.map((nft, index) => (
               <Grid container key={index} sx={{ 
                 py: 1, 
                 borderBottom: 1, 
@@ -499,7 +548,7 @@ function App() {
         </Box>
       ) : (
         <List sx={{ bgcolor: '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
-          {filteredNfts.slice((page - 1) * itemsPerPage, page * itemsPerPage).map((nft, index) => (
+          {filteredNfts.map((nft, index) => (
             <ListItem key={index} divider sx={{ borderColor: 'rgba(0, 0, 0, 0.12)' }}>
               <Grid container alignItems="center">
                 <Grid item xs={2}>
@@ -540,25 +589,6 @@ function App() {
             </ListItem>
           ))}
         </List>
-      )}
-
-      {pageCount > 1 && (
-        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
-          <Pagination 
-            count={pageCount} 
-            page={page} 
-            onChange={handlePageChange} 
-            sx={{
-              '& .MuiPaginationItem-root': {
-                color: 'rgba(0, 0, 0, 0.87)',
-              },
-              '& .Mui-selected': {
-                backgroundColor: '#1976d2 !important',
-                color: '#ffffff',
-              },
-            }}
-          />
-        </Box>
       )}
     </Container>
   );
