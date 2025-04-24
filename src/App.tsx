@@ -51,7 +51,7 @@ interface NFT {
   'Hosting Type': string;
 }
 
-type SortField = 'Artwork Title' | 'Mint Date' | 'Type' | 'Edt Size';
+type SortField = 'Artwork Title' | 'Mint Date' | 'Type' | 'Edt Size' | 'Platform' | 'Collaborator/Special Type';
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'grid' | 'list';
 
@@ -453,7 +453,7 @@ function App() {
               <Grid item xs={1}>
                 <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Image</Typography>
               </Grid>
-              <Grid item xs={3}>
+              <Grid item xs={2}>
                 <Box 
                   onClick={() => handleColumnClick('Artwork Title')}
                   sx={{ 
@@ -468,7 +468,7 @@ function App() {
                   </Typography>
                 </Box>
               </Grid>
-              <Grid item xs={2}>
+              <Grid item xs={1}>
                 <Box 
                   onClick={() => handleColumnClick('Mint Date')}
                   sx={{ 
@@ -483,7 +483,7 @@ function App() {
                   </Typography>
                 </Box>
               </Grid>
-              <Grid item xs={2}>
+              <Grid item xs={1}>
                 <Box 
                   onClick={() => handleColumnClick('Type')}
                   sx={{ 
@@ -498,7 +498,7 @@ function App() {
                   </Typography>
                 </Box>
               </Grid>
-              <Grid item xs={2}>
+              <Grid item xs={1}>
                 <Box 
                   onClick={() => handleColumnClick('Edt Size')}
                   sx={{ 
@@ -514,6 +514,36 @@ function App() {
                 </Box>
               </Grid>
               <Grid item xs={2}>
+                <Box 
+                  onClick={() => handleColumnClick('Platform')}
+                  sx={{ 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
+                    Platform {getSortIcon('Platform')}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={3}>
+                <Box 
+                  onClick={() => handleColumnClick('Collaborator/Special Type')}
+                  sx={{ 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
+                    Collaborator/Special Type {getSortIcon('Collaborator/Special Type')}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={1}>
                 <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Link</Typography>
               </Grid>
             </Grid>
@@ -541,27 +571,37 @@ function App() {
                     />
                   </Box>
                 </Grid>
-                <Grid item xs={3} sx={{ display: 'flex', alignItems: 'center' }}>
+                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
                   <Typography variant="body1" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft['Artwork Title'] || 'Untitled'}
                   </Typography>
                 </Grid>
-                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                   <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft['Mint Date']}
                   </Typography>
                 </Grid>
-                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                   <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft.Type}
                   </Typography>
                 </Grid>
-                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                   <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft['Edt Size']}
                   </Typography>
                 </Grid>
                 <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
+                    {nft['Platform']}
+                  </Typography>
+                </Grid>
+                <Grid item xs={3} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
+                    {nft['Collaborator/Special Type']}
+                  </Typography>
+                </Grid>
+                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                   {nft.Link && (
                     <Link 
                       href={nft.Link} 
@@ -594,17 +634,23 @@ function App() {
                     style={{ width: '100%', height: 'auto' }}
                   />
                 </Grid>
-                <Grid item xs={3}>
+                <Grid item xs={2}>
                   <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Artwork Title']}</Typography>
                 </Grid>
-                <Grid item xs={2}>
+                <Grid item xs={1}>
                   <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Mint Date']}</Typography>
                 </Grid>
-                <Grid item xs={2}>
+                <Grid item xs={1}>
                   <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Type']}</Typography>
                 </Grid>
-                <Grid item xs={2}>
+                <Grid item xs={1}>
                   <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Edt Size']}</Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Platform']}</Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Collaborator/Special Type']}</Typography>
                 </Grid>
                 <Grid item xs={1}>
                   <Link 
