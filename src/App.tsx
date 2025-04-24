@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Container, 
   Grid, 
@@ -72,7 +72,7 @@ function App() {
 
   useEffect(() => {
     // Load CSV data
-    fetch('./Brinkman NFT Catalog - Sheet1 (6).csv')
+    fetch('./Brinkman NFT Catalog - Sheet1 (7).csv')
       .then(response => response.text())
       .then(data => {
         Papa.parse(data, {
@@ -383,7 +383,7 @@ function App() {
   };
 
   // Add price fetching function
-  const fetchOpenSeaPrice = async (contractAddress: string, tokenId: string): Promise<string> => {
+  const fetchOpenSeaPrice = useCallback(async (contractAddress: string, tokenId: string): Promise<string> => {
     try {
       // Add delay to avoid rate limiting
       await delay(100);
@@ -427,7 +427,7 @@ function App() {
       console.error('Error fetching OpenSea price:', error);
       return 'N/A';
     }
-  };
+  }, []);
 
   // Add useEffect to fetch prices
   useEffect(() => {
@@ -457,7 +457,7 @@ function App() {
     if (nfts.length > 0) {
       fetchPrices();
     }
-  }, [nfts.length]); // Only run when nfts array length changes
+  }, [nfts, fetchOpenSeaPrice]); // Added missing dependencies
 
   if (loading) {
     return (
