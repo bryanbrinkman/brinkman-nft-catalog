@@ -49,7 +49,8 @@ interface NFT {
   'IPFS Json': string;
   'Pinned?': string;
   'Hosting Type': string;
-  'Price'?: string; // Optional price field
+  'Image link': string;
+  'Price'?: string;
 }
 
 type SortField = 'Artwork Title' | 'Mint Date' | 'Type' | 'Edt Size' | 'Platform' | 'Collaborator/Special Type' | 'Price';
@@ -71,7 +72,7 @@ function App() {
 
   useEffect(() => {
     // Load CSV data
-    fetch('./Brinkman NFT Catalog - Sheet1 (4).csv')
+    fetch('./Brinkman NFT Catalog - Sheet1 (6).csv')
       .then(response => response.text())
       .then(data => {
         Papa.parse(data, {
@@ -150,11 +151,27 @@ function App() {
   const types = [...new Set(nfts.map(nft => nft.Type))].filter(Boolean);
   const collaborators = [...new Set(nfts.map(nft => nft['Collaborator/Special Type']))].filter(Boolean);
 
+  // Helper function to delay between API calls
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const getImageUrl = async (nft: NFT): Promise<string> => {
     // Helper function to delay between API calls
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // First try OpenSea API if we have contract and token info
+    // First try the direct image link if available
+    if (nft['Image link']) {
+      try {
+        const response = await fetch(nft['Image link'], { method: 'HEAD' });
+        if (response.ok) {
+          console.log('Direct image link found for:', nft['Artwork Title']);
+          return nft['Image link'];
+        }
+      } catch (error) {
+        console.warn('Error fetching from direct image link for:', nft['Artwork Title'], error);
+      }
+    }
+
+    // Then try OpenSea API if we have contract and token info
     if (nft['Contract Hash'] && nft['TokenID Start']) {
       try {
         // Add a small delay to avoid rate limiting
@@ -188,30 +205,43 @@ function App() {
     if (nft['IPFS Image']) {
       try {
         const ipfsHash = nft['IPFS Image'].trim();
-        // Remove 'ipfs://' if present
-        const cleanHash = ipfsHash.replace('ipfs://', '');
+        // Remove 'ipfs://' if present and any trailing slashes
+        const cleanHash = ipfsHash.replace('ipfs://', '').replace(/\/+$/, '');
         
         const gateways = [
           'https://nftstorage.link/ipfs/',
-          'https://cloudflare-ipfs.com/ipfs/',
           'https://ipfs.io/ipfs/',
           'https://gateway.pinata.cloud/ipfs/',
           'https://dweb.link/ipfs/',
-          'https://gateway.ipfs.io/ipfs/'
+          'https://gateway.ipfs.io/ipfs/',
+          'https://cloudflare-ipfs.com/ipfs/'
         ];
 
         // Try each gateway in sequence until one works
         for (const gateway of gateways) {
           try {
             const url = `${gateway}${cleanHash}`;
-            // Test if the image is accessible
-            const response = await fetch(url, { method: 'HEAD' });
+            // Test if the image is accessible with a timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+            const response = await fetch(url, { 
+              method: 'HEAD',
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+
             if (response.ok) {
               console.log('IPFS image found at', gateway, 'for:', nft['Artwork Title']);
               return url;
             }
-          } catch (error) {
-            console.warn('Failed to load from gateway:', gateway, 'for:', nft['Artwork Title']);
+          } catch (error: any) {
+            if (error.name === 'AbortError') {
+              console.warn('Gateway timeout:', gateway, 'for:', nft['Artwork Title']);
+            } else {
+              console.warn('Failed to load from gateway:', gateway, 'for:', nft['Artwork Title']);
+            }
             continue;
           }
         }
@@ -225,17 +255,46 @@ function App() {
       nft.Link.endsWith('.jpg') || 
       nft.Link.endsWith('.jpeg') || 
       nft.Link.endsWith('.png') || 
-      nft.Link.endsWith('.gif') ||
-      nft.Link.includes('opensea.io/assets')
+      nft.Link.endsWith('.gif')
     )) {
       try {
-        const response = await fetch(nft.Link, { method: 'HEAD' });
-        if (response.ok) {
-          console.log('Direct link image found for:', nft['Artwork Title']);
-          return nft.Link;
+        // Skip direct HEAD requests to OpenSea website URLs
+        if (nft.Link.includes('opensea.io/assets')) {
+          console.log('Skipping direct OpenSea website URL:', nft.Link);
+          // Try to get the image from OpenSea API instead
+          if (nft['Contract Hash'] && nft['TokenID Start']) {
+            try {
+              const response = await fetch(
+                `https://api.opensea.io/api/v2/chain/ethereum/contract/${nft['Contract Hash']}/nfts/${nft['TokenID Start']}`,
+                {
+                  headers: {
+                    'X-API-KEY': process.env.REACT_APP_OPENSEA_API_KEY || '',
+                    'Accept': 'application/json'
+                  }
+                }
+              );
+
+              if (response.ok) {
+                const data = await response.json();
+                if (data.nft && data.nft.image_url) {
+                  console.log('OpenSea API image found for:', nft['Artwork Title']);
+                  return data.nft.image_url;
+                }
+              }
+            } catch (error) {
+              console.warn('OpenSea API error for:', nft['Artwork Title'], error);
+            }
+          }
+        } else {
+          // For non-OpenSea URLs, try the direct link
+          const response = await fetch(nft.Link, { method: 'HEAD' });
+          if (response.ok) {
+            console.log('Direct link image found for:', nft['Artwork Title']);
+            return nft.Link;
+          }
         }
       } catch (error) {
-        console.error('Error fetching from direct link for:', nft['Artwork Title'], error);
+        console.warn('Error fetching from direct link for:', nft['Artwork Title'], error);
       }
     }
 
@@ -326,18 +385,26 @@ function App() {
   // Add price fetching function
   const fetchOpenSeaPrice = async (contractAddress: string, tokenId: string): Promise<string> => {
     try {
+      // Add delay to avoid rate limiting
+      await delay(100);
+      
       const response = await fetch(
         `https://api.opensea.io/api/v2/chain/ethereum/contract/${contractAddress}/nfts/${tokenId}/listings`,
         {
           headers: {
-            'X-API-KEY': process.env.REACT_APP_OPENSEA_API_KEY || '', // API key should be in .env file
+            'X-API-KEY': process.env.REACT_APP_OPENSEA_API_KEY || '',
             'Accept': 'application/json'
           }
         }
       );
       
       if (!response.ok) {
-        console.error('OpenSea API error:', await response.text());
+        if (response.status === 429) {
+          console.warn('OpenSea API rate limit reached, waiting before retry...');
+          await delay(1000); // Wait 1 second before retry
+          return fetchOpenSeaPrice(contractAddress, tokenId); // Retry the request
+        }
+        console.warn('OpenSea API error:', await response.text());
         return 'N/A';
       }
 
@@ -350,7 +417,9 @@ function App() {
         }, null);
 
         if (lowestPriceListing) {
-          return `${lowestPriceListing.price.current.value} ${lowestPriceListing.price.current.currency}`;
+          const price = parseFloat(lowestPriceListing.price.current.value);
+          const currency = lowestPriceListing.price.current.currency;
+          return `${price.toFixed(3)} ${currency}`;
         }
       }
       return 'Not Listed';
@@ -363,16 +432,26 @@ function App() {
   // Add useEffect to fetch prices
   useEffect(() => {
     const fetchPrices = async () => {
-      const updatedNfts = await Promise.all(
-        nfts.map(async (nft) => {
-          if (nft['Contract Hash'] && nft['TokenID Start']) {
-            const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start']);
-            return { ...nft, Price: price };
+      console.log('Starting price fetch for', nfts.length, 'NFTs');
+      const updatedNfts = [...nfts];
+      let hasChanges = false;
+
+      for (let i = 0; i < nfts.length; i++) {
+        const nft = nfts[i];
+        if (nft['Contract Hash'] && nft['TokenID Start'] && !nft.Price) {
+          console.log('Fetching price for:', nft['Artwork Title']);
+          const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start']);
+          if (price !== 'N/A') {
+            updatedNfts[i] = { ...nft, Price: price };
+            hasChanges = true;
           }
-          return { ...nft, Price: 'N/A' };
-        })
-      );
-      setNfts(updatedNfts);
+        }
+      }
+
+      if (hasChanges) {
+        console.log('Updating NFTs with new prices');
+        setNfts(updatedNfts);
+      }
     };
 
     if (nfts.length > 0) {
