@@ -572,36 +572,12 @@ function App() {
                 </Box>
               </Grid>
               <Grid item xs={2}>
-                <Box 
-                  onClick={() => handleColumnClick('Platform')}
-                  sx={{ 
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    '&:hover': { opacity: 0.8 }
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
-                    Platform {getSortIcon('Platform')}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={3}>
-                <Box 
-                  onClick={() => handleColumnClick('Collaborator/Special Type')}
-                  sx={{ 
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    '&:hover': { opacity: 0.8 }
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
-                    Collaborator/Special Type {getSortIcon('Collaborator/Special Type')}
-                  </Typography>
-                </Box>
+                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Platform</Typography>
               </Grid>
               <Grid item xs={2}>
+                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Collaborator/Special Type</Typography>
+              </Grid>
+              <Grid item xs={1}>
                 <Box 
                   onClick={() => handleColumnClick('Price')}
                   sx={{ 
@@ -669,12 +645,12 @@ function App() {
                     {nft['Platform']}
                   </Typography>
                 </Grid>
-                <Grid item xs={3} sx={{ display: 'flex', alignItems: 'center' }}>
+                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
                   <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft['Collaborator/Special Type']}
                   </Typography>
                 </Grid>
-                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                   <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
                     {nft.Price || 'N/A'}
                   </Typography>
@@ -727,10 +703,10 @@ function App() {
                 <Grid item xs={2}>
                   <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Platform']}</Typography>
                 </Grid>
-                <Grid item xs={2}>
+                <Grid item xs={1}>
                   <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Collaborator/Special Type']}</Typography>
                 </Grid>
-                <Grid item xs={2}>
+                <Grid item xs={1}>
                   <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft.Price || 'N/A'}</Typography>
                 </Grid>
                 <Grid item xs={1}>
