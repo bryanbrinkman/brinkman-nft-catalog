@@ -150,37 +150,77 @@ function App() {
   const types = [...new Set(nfts.map(nft => nft.Type))].filter(Boolean);
   const collaborators = [...new Set(nfts.map(nft => nft['Collaborator/Special Type']))].filter(Boolean);
 
-  const getImageUrl = (nft: NFT) => {
+  const getImageUrl = async (nft: NFT): Promise<string> => {
+    // First try OpenSea API if we have contract and token info
+    if (nft['Contract Hash'] && nft['TokenID Start']) {
+      try {
+        const response = await fetch(
+          `https://api.opensea.io/api/v2/chain/ethereum/contract/${nft['Contract Hash']}/nfts/${nft['TokenID Start']}`,
+          {
+            headers: {
+              'X-API-KEY': process.env.REACT_APP_OPENSEA_API_KEY || '',
+              'Accept': 'application/json'
+            }
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.nft && data.nft.image_url) {
+            return data.nft.image_url;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching from OpenSea:', error);
+      }
+    }
+
+    // If OpenSea fails or isn't available, try IPFS
     if (nft['IPFS Image']) {
-      // Remove any leading/trailing whitespace
       const ipfsHash = nft['IPFS Image'].trim();
-      
-      // List of IPFS gateways to try
       const gateways = [
         'https://ipfs.io/ipfs/',
         'https://cloudflare-ipfs.com/ipfs/',
         'https://gateway.pinata.cloud/ipfs/',
-        'https://dweb.link/ipfs/'
+        'https://dweb.link/ipfs/',
+        'https://gateway.ipfs.io/ipfs/'
       ];
       
       // Use a random gateway to distribute the load
       const gateway = gateways[Math.floor(Math.random() * gateways.length)];
       return `${gateway}${ipfsHash}`;
     }
+
     return 'https://via.placeholder.com/300x300?text=No+Image';
   };
 
-  // Add an image error handler component
-  const ImageWithFallback = ({ src, alt, style }: { src: string, alt: string, style: React.CSSProperties }) => {
-    const [currentSrc, setCurrentSrc] = useState(src);
+  // Update ImageWithFallback component to handle async image URL
+  const ImageWithFallback = ({ nft, style }: { nft: NFT, style: React.CSSProperties }) => {
+    const [currentSrc, setCurrentSrc] = useState<string>('https://via.placeholder.com/300x300?text=Loading...');
     const [errorCount, setErrorCount] = useState(0);
+    const maxRetries = 3;
     
-    const handleError = () => {
-      if (errorCount < 3) { // Try up to 3 different gateways
+    useEffect(() => {
+      const loadImage = async () => {
+        try {
+          const imageUrl = await getImageUrl(nft);
+          setCurrentSrc(imageUrl);
+        } catch (error) {
+          console.error('Error loading image:', error);
+          setCurrentSrc('https://via.placeholder.com/300x300?text=Error+Loading+Image');
+        }
+      };
+      
+      loadImage();
+    }, [nft]);
+
+    const handleError = async () => {
+      if (errorCount < maxRetries) {
         setErrorCount(prev => prev + 1);
-        setCurrentSrc(getImageUrl({ ...nfts[0], 'IPFS Image': src.split('/ipfs/')[1] }));
+        // Try getting a new URL on error
+        const newUrl = await getImageUrl(nft);
+        setCurrentSrc(newUrl);
       } else {
-        // If all gateways fail, show placeholder
         setCurrentSrc('https://via.placeholder.com/300x300?text=Image+Not+Available');
       }
     };
@@ -188,7 +228,7 @@ function App() {
     return (
       <img
         src={currentSrc}
-        alt={alt}
+        alt={nft['Artwork Title'] || 'NFT'}
         style={style}
         onError={handleError}
       />
@@ -609,8 +649,7 @@ function App() {
                 <Grid item xs={1}>
                   <Box sx={{ width: 60, height: 60 }}>
                     <ImageWithFallback
-                      src={getImageUrl(nft)}
-                      alt={nft['Collection Name'] || nft.Type || 'NFT'}
+                      nft={nft}
                       style={{ 
                         width: '100%', 
                         height: '100%', 
@@ -683,8 +722,7 @@ function App() {
               <Grid container alignItems="center">
                 <Grid item xs={2}>
                   <ImageWithFallback
-                    src={getImageUrl(nft)}
-                    alt={nft['Artwork Title']}
+                    nft={nft}
                     style={{ width: '100%', height: 'auto' }}
                   />
                 </Grid>
