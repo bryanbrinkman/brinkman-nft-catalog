@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/brinkman-nft-catalog/static/js/main.0d57dbec.js",
+    "main.js": "/brinkman-nft-catalog/static/js/main.eb4f3005.js",
     "index.html": "/brinkman-nft-catalog/index.html",
-    "main.0d57dbec.js.map": "/brinkman-nft-catalog/static/js/main.0d57dbec.js.map"
+    "main.eb4f3005.js.map": "/brinkman-nft-catalog/static/js/main.eb4f3005.js.map"
   },
   "entrypoints": [
-    "static/js/main.0d57dbec.js"
+    "static/js/main.eb4f3005.js"
   ]
 }
