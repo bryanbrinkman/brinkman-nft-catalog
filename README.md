@@ -18,15 +18,29 @@ A modern, responsive web application for displaying and filtering Bryan Brinkman
 npm install
 ```
 
-2. Start the development server:
+2. Create a `.env` file in the root directory with the following variables:
+```env
+# OpenSea API Key
+REACT_APP_OPENSEA_API_KEY=your_opensea_api_key_here
+
+# Server Port (optional)
+PORT=3001
+```
+
+3. Start the development server:
 ```bash
 npm start
 ```
 
-3. Build for production:
+4. Build for production:
 ```bash
 npm run build
 ```
+
+## Environment Variables
+
+- `REACT_APP_OPENSEA_API_KEY`: Your OpenSea API key for fetching NFT prices
+- `PORT`: (Optional) Port number for the proxy server (default: 3001)
 
 ## Deployment
 
@@ -36,12 +50,14 @@ npm run build
 2. Connect your repository
 3. Set build command: `npm run build`
 4. Set publish directory: `build`
+5. Add environment variables in Netlify dashboard
 
 ### Option 2: Deploy to Vercel
 
 1. Create a new project on Vercel
 2. Connect your repository
 3. Vercel will automatically detect the React build settings
+4. Add environment variables in Vercel dashboard
 
 ### Option 3: Embed in Squarespace
 
