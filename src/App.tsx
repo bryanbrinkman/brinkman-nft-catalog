@@ -1,10 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Container, 
   Grid, 
-  Card, 
-  CardContent, 
-  CardMedia, 
   Typography, 
   TextField,
   Select,
@@ -13,24 +10,27 @@ import {
   InputLabel,
   Box,
   CircularProgress,
-  Pagination,
-  SelectChangeEvent,
   Chip,
   Stack,
   IconButton,
   Tooltip,
-  Divider,
   Link,
-  List,
-  ListItem
+  Card,
+  CssBaseline
 } from '@mui/material';
 import { 
-  Sort as SortIcon, 
   FilterList as FilterIcon,
-  ViewModule as GridIcon,
-  ViewList as ListIcon
+  ViewList as GridIcon,
+  ViewComfy as GalleryIcon,
+  Search as SearchIcon,
+  Brightness4 as Brightness4Icon,
+  Brightness7 as Brightness7Icon
 } from '@mui/icons-material';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Papa from 'papaparse';
+
+// Helper function to delay between API calls
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface NFT {
   'Artwork Title': string;
@@ -55,12 +55,13 @@ interface NFT {
 
 type SortField = 'Artwork Title' | 'Mint Date' | 'Type' | 'Edt Size' | 'Platform' | 'Collaborator/Special Type' | 'Price';
 type SortOrder = 'asc' | 'desc';
-type ViewMode = 'grid' | 'list';
+type ViewMode = 'grid' | 'gallery';
 
 function App() {
   const [nfts, setNfts] = useState<NFT[]>([]);
   const [filteredNfts, setFilteredNfts] = useState<NFT[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   const [platformFilter, setPlatformFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [collaboratorFilter, setCollaboratorFilter] = useState('');
@@ -69,10 +70,35 @@ function App() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [showFilters, setShowFilters] = useState(false);
+  const [isPriceLoading, setIsPriceLoading] = useState<boolean>(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
+
+  const theme = useMemo(() => createTheme({
+    palette: {
+      mode: darkMode ? 'dark' : 'light',
+      background: {
+        default: darkMode ? '#181a20' : '#f5f5f5',
+        paper: darkMode ? '#23272f' : '#fff',
+      },
+      primary: {
+        main: darkMode ? '#90caf9' : '#1976d2',
+      },
+    },
+    shape: {
+      borderRadius: 8,
+    },
+  }), [darkMode]);
 
   useEffect(() => {
     // Load CSV data
-    fetch('./Brinkman NFT Catalog - Sheet1 (8).csv')
+    fetch('./Brinkman NFT Catalog - Sheet1 (10).csv')
       .then(response => response.text())
       .then(data => {
         Papa.parse(data, {
@@ -151,13 +177,7 @@ function App() {
   const types = [...new Set(nfts.map(nft => nft.Type))].filter(Boolean);
   const collaborators = [...new Set(nfts.map(nft => nft['Collaborator/Special Type']))].filter(Boolean);
 
-  // Helper function to delay between API calls
-  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
   const getImageUrl = async (nft: NFT): Promise<string> => {
-    // Helper function to delay between API calls
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
     // First try the direct image link if available
     if (nft['Image link']) {
       try {
@@ -181,7 +201,6 @@ function App() {
           `https://api.opensea.io/api/v2/chain/ethereum/contract/${nft['Contract Hash']}/nfts/${nft['TokenID Start']}`,
           {
             headers: {
-              'X-API-KEY': process.env.REACT_APP_OPENSEA_API_KEY || '',
               'Accept': 'application/json'
             }
           }
@@ -268,7 +287,6 @@ function App() {
                 `https://api.opensea.io/api/v2/chain/ethereum/contract/${nft['Contract Hash']}/nfts/${nft['TokenID Start']}`,
                 {
                   headers: {
-                    'X-API-KEY': process.env.REACT_APP_OPENSEA_API_KEY || '',
                     'Accept': 'application/json'
                   }
                 }
@@ -382,82 +400,105 @@ function App() {
     setSortOrder('desc');
   };
 
-  // Add price fetching function
+  // Updated price fetching function with better error handling
   const fetchOpenSeaPrice = useCallback(async (contractAddress: string, tokenId: string): Promise<string> => {
     try {
-      // Add delay to avoid rate limiting
-      await delay(100);
+      await delay(100); // Rate limiting delay
       
-      const response = await fetch(
-        `https://api.opensea.io/api/v2/chain/ethereum/contract/${contractAddress}/nfts/${tokenId}/listings`,
-        {
-          headers: {
-            'X-API-KEY': process.env.REACT_APP_OPENSEA_API_KEY || '',
-            'Accept': 'application/json'
-          }
-        }
+      // Get collection info from the NFT data
+      const nftWithCollection = nfts.find(nft => 
+        nft['Contract Hash']?.toLowerCase() === contractAddress.toLowerCase() &&
+        nft['Collection Name']
       );
+
+      if (!nftWithCollection || !nftWithCollection['Collection Name']) {
+        console.warn('No collection name found for:', contractAddress);
+        return 'Not Listed';
+      }
+
+      // Convert collection name to slug format
+      const collectionSlug = nftWithCollection['Collection Name']
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
+        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+
+      console.log('Trying collection slug:', collectionSlug);
+
+      // Get the collection stats which includes floor price
+      const statsResponse = await fetch(
+        `https://api.opensea.io/api/v1/collection/${collectionSlug}/stats`
+      );
+
+      if (!statsResponse.ok) {
+        console.warn('Could not fetch collection stats:', await statsResponse.text());
+        return 'Not Listed';
+      }
+
+      const statsData = await statsResponse.json();
+      console.log('Collection stats:', statsData);
       
-      if (!response.ok) {
-        if (response.status === 429) {
-          console.warn('OpenSea API rate limit reached, waiting before retry...');
-          await delay(1000); // Wait 1 second before retry
-          return fetchOpenSeaPrice(contractAddress, tokenId); // Retry the request
-        }
-        console.warn('OpenSea API error:', await response.text());
-        return 'N/A';
+      const floorPrice = statsData.stats?.floor_price;
+
+      if (floorPrice) {
+        return `${floorPrice.toFixed(3)} ETH (Floor)`;
       }
 
-      const data = await response.json();
-      if (data.listings && data.listings.length > 0) {
-        // Get the lowest price listing
-        const lowestPriceListing = data.listings.reduce((lowest: any, current: any) => {
-          const currentPrice = parseFloat(current.price.current.value);
-          return !lowest || currentPrice < parseFloat(lowest.price.current.value) ? current : lowest;
-        }, null);
-
-        if (lowestPriceListing) {
-          const price = parseFloat(lowestPriceListing.price.current.value);
-          const currency = lowestPriceListing.price.current.currency;
-          return `${price.toFixed(3)} ${currency}`;
-        }
-      }
       return 'Not Listed';
     } catch (error) {
-      console.error('Error fetching OpenSea price:', error);
-      return 'N/A';
+      console.error('Error fetching price:', error);
+      return 'Error';
     }
-  }, []);
+  }, [nfts]);
 
-  // Add useEffect to fetch prices
-  useEffect(() => {
-    const fetchPrices = async () => {
-      console.log('Starting price fetch for', nfts.length, 'NFTs');
-      const updatedNfts = [...nfts];
-      let hasChanges = false;
+  // Function to fetch all prices
+  const fetchAllPrices = useCallback(async () => {
+    if (isPriceLoading) return; // Prevent multiple simultaneous updates
+    
+    setIsPriceLoading(true);
+    console.log('Starting price fetch for', nfts.length, 'artworks');
+    
+    const updatedNfts = [...nfts];
+    let hasChanges = false;
+    let successCount = 0;
+    let errorCount = 0;
 
-      for (let i = 0; i < nfts.length; i++) {
-        const nft = nfts[i];
-        if (nft['Contract Hash'] && nft['TokenID Start'] && !nft.Price) {
-          console.log('Fetching price for:', nft['Artwork Title']);
+    for (let i = 0; i < nfts.length; i++) {
+      const nft = nfts[i];
+      if (nft['Contract Hash'] && nft['TokenID Start']) {
+        try {
           const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start']);
-          if (price !== 'N/A') {
+          if (price !== 'Error') {
             updatedNfts[i] = { ...nft, Price: price };
             hasChanges = true;
+            successCount++;
+          } else {
+            errorCount++;
           }
+        } catch (error) {
+          console.error('Error updating price for:', nft['Artwork Title'], error);
+          errorCount++;
         }
       }
-
-      if (hasChanges) {
-        console.log('Updating NFTs with new prices');
-        setNfts(updatedNfts);
-      }
-    };
-
-    if (nfts.length > 0) {
-      fetchPrices();
     }
-  }, [nfts, fetchOpenSeaPrice]); // Added missing dependencies
+
+    if (hasChanges) {
+      console.log(`Price update complete. Success: ${successCount}, Errors: ${errorCount}`);
+      setNfts(updatedNfts);
+    }
+    
+    setIsPriceLoading(false);
+  }, [nfts, fetchOpenSeaPrice, isPriceLoading]);
+
+  // Set up periodic price refresh
+  useEffect(() => {
+    // Initial price fetch
+    fetchAllPrices();
+
+    // Set up interval for periodic updates
+    const interval = setInterval(fetchAllPrices, 5 * 60 * 1000); // Update every 5 minutes
+
+    return () => clearInterval(interval);
+  }, [fetchAllPrices]);
 
   if (loading) {
     return (
@@ -468,450 +509,481 @@ function App() {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4, bgcolor: '#f5f5f5' }}>
-      <Box sx={{ mb: 4 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Search"
-              variant="outlined"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name, platform, type, or collaborator"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  '& fieldset': {
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: 'rgba(0, 0, 0, 0.87)',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#1976d2',
-                  },
-                  backgroundColor: '#ffffff',
-                },
-                '& .MuiInputLabel-root': {
-                  color: 'rgba(0, 0, 0, 0.87)',
-                },
-                '& .MuiInputBase-input': {
-                  color: 'rgba(0, 0, 0, 0.87)',
-                },
-              }}
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Container maxWidth="xl" sx={{ py: 2, bgcolor: 'background.default' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Box sx={{ mb: 2, width: '150px', height: 'auto', bgcolor: darkMode ? '#23272f' : '#fff', borderRadius: 2, border: '2px solid', borderColor: darkMode ? '#444' : '#ddd', p: 1 }}>
+            <img 
+              src={darkMode ? "/brinkman-nft-catalog/catlogo_Darkmode.png" : "/brinkman-nft-catalog/catlogo.png"} 
+              alt="Cat Logo" 
+              style={{ 
+                width: '100%', 
+                height: 'auto',
+                display: 'block'
+              }} 
             />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box display="flex" justifyContent="flex-end" gap={1}>
-              <Tooltip title="Toggle Filters">
-                <IconButton 
-                  onClick={() => setShowFilters(!showFilters)} 
-                  sx={{ color: 'rgba(0, 0, 0, 0.87)' }}
-                >
-                  <FilterIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Grid View">
-                <IconButton 
-                  onClick={() => setViewMode('grid')} 
-                  sx={{ color: viewMode === 'grid' ? '#1976d2' : 'rgba(0, 0, 0, 0.87)' }}
-                >
-                  <GridIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="List View">
-                <IconButton 
-                  onClick={() => setViewMode('list')} 
-                  sx={{ color: viewMode === 'list' ? '#1976d2' : 'rgba(0, 0, 0, 0.87)' }}
-                >
-                  <ListIcon />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Grid>
-        </Grid>
-
-        {showFilters && (
-          <Box sx={{ mt: 2, p: 2, bgcolor: '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={3}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>Platform</InputLabel>
-                  <Select
-                    value={platformFilter}
-                    label="Platform"
-                    onChange={(e) => setPlatformFilter(e.target.value)}
-                    sx={{ 
-                      color: 'rgba(0, 0, 0, 0.87)',
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                      },
-                    }}
-                  >
-                    <MenuItem value="">All Platforms</MenuItem>
-                    {platforms.map((platform) => (
-                      <MenuItem key={platform} value={platform}>
-                        {platform}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>Type</InputLabel>
-                  <Select
-                    value={typeFilter}
-                    label="Type"
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                    sx={{ 
-                      color: 'rgba(0, 0, 0, 0.87)',
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                      },
-                    }}
-                  >
-                    <MenuItem value="">All Types</MenuItem>
-                    {types.map((type) => (
-                      <MenuItem key={type} value={type}>
-                        {type}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>Collaborator</InputLabel>
-                  <Select
-                    value={collaboratorFilter}
-                    label="Collaborator"
-                    onChange={(e) => setCollaboratorFilter(e.target.value)}
-                    sx={{ 
-                      color: 'rgba(0, 0, 0, 0.87)',
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'rgba(0, 0, 0, 0.23)',
-                      },
-                    }}
-                  >
-                    <MenuItem value="">All Collaborators</MenuItem>
-                    {collaborators.map((collaborator) => (
-                      <MenuItem key={collaborator} value={collaborator}>
-                        {collaborator}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <Box display="flex" alignItems="center" height="100%">
-                  <Chip 
-                    label="Clear Filters" 
-                    onClick={clearFilters} 
-                    color="primary" 
+          </Box>
+          <Box sx={{ width: '100%', mb: 2 }}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={6}>
+                {showSearch && (
+                  <TextField
+                    fullWidth
+                    label="Search"
                     variant="outlined"
-                    sx={{ width: '100%' }}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search by name, platform, type, or collaborator"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        '& fieldset': {
+                          borderColor: 'rgba(0, 0, 0, 0.23)',
+                        },
+                        '&:hover fieldset': {
+                          borderColor: 'rgba(0, 0, 0, 0.87)',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#1976d2',
+                        },
+                        backgroundColor: '#ffffff',
+                      },
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(0, 0, 0, 0.87)',
+                      },
+                      '& .MuiInputBase-input': {
+                        color: 'rgba(0, 0, 0, 0.87)',
+                      },
+                    }}
                   />
+                )}
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box display="flex" justifyContent="flex-end" gap={1}>
+                  <Tooltip title="Toggle Search">
+                    <IconButton 
+                      onClick={() => {
+                        setShowSearch(!showSearch);
+                        if (showSearch) setSearchTerm(''); // Clear search when hiding
+                      }}
+                      sx={{ color: showSearch ? '#1976d2' : darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)' }}
+                    >
+                      <SearchIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Toggle Filters">
+                    <IconButton 
+                      onClick={() => setShowFilters(!showFilters)} 
+                      sx={{ color: showFilters ? '#1976d2' : darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)' }}
+                    >
+                      <FilterIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Grid View">
+                    <IconButton 
+                      onClick={() => setViewMode('grid')} 
+                      sx={{ color: viewMode === 'grid' ? '#1976d2' : darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)' }}
+                    >
+                      <GridIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Gallery View">
+                    <IconButton 
+                      onClick={() => setViewMode('gallery')} 
+                      sx={{ color: viewMode === 'gallery' ? '#1976d2' : darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)' }}
+                    >
+                      <GalleryIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
+                    <IconButton onClick={() => setDarkMode((prev: boolean) => !prev)} sx={{ color: darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)' }}>
+                      {darkMode ? <Brightness7Icon /> : <Brightness4Icon />}
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               </Grid>
             </Grid>
           </Box>
-        )}
 
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
-            Showing {filteredNfts.length} NFTs
-          </Typography>
-          <Stack direction="row" spacing={1}>
-            <Chip 
-              label="Unique" 
-              onClick={() => setTypeFilter(typeFilter === 'Unique' ? '' : 'Unique')}
-              sx={{
-                color: typeFilter === 'Unique' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
-                backgroundColor: typeFilter === 'Unique' ? '#1976d2' : '#ffffff',
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                '&:hover': {
-                  backgroundColor: typeFilter === 'Unique' ? '#1565c0' : '#f5f5f5',
-                },
-              }}
-              variant={typeFilter === 'Unique' ? 'filled' : 'outlined'}
-            />
-            <Chip 
-              label="Edition" 
-              onClick={() => setTypeFilter(typeFilter === 'Edition' ? '' : 'Edition')}
-              sx={{
-                color: typeFilter === 'Edition' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
-                backgroundColor: typeFilter === 'Edition' ? '#1976d2' : '#ffffff',
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                '&:hover': {
-                  backgroundColor: typeFilter === 'Edition' ? '#1565c0' : '#f5f5f5',
-                },
-              }}
-              variant={typeFilter === 'Edition' ? 'filled' : 'outlined'}
-            />
-            <Chip 
-              label="Generative" 
-              onClick={() => setTypeFilter(typeFilter === 'Generative' ? '' : 'Generative')}
-              sx={{
-                color: typeFilter === 'Generative' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
-                backgroundColor: typeFilter === 'Generative' ? '#1976d2' : '#ffffff',
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                '&:hover': {
-                  backgroundColor: typeFilter === 'Generative' ? '#1565c0' : '#f5f5f5',
-                },
-              }}
-              variant={typeFilter === 'Generative' ? 'filled' : 'outlined'}
-            />
-            <Chip 
-              label="Series" 
-              onClick={() => setTypeFilter(typeFilter === 'Series' ? '' : 'Series')}
-              sx={{
-                color: typeFilter === 'Series' ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
-                backgroundColor: typeFilter === 'Series' ? '#1976d2' : '#ffffff',
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-                '&:hover': {
-                  backgroundColor: typeFilter === 'Series' ? '#1565c0' : '#f5f5f5',
-                },
-              }}
-              variant={typeFilter === 'Series' ? 'filled' : 'outlined'}
-            />
-          </Stack>
-        </Box>
-      </Box>
-
-      {viewMode === 'grid' ? (
-        <Box sx={{ width: '100%', overflowX: 'auto', bgcolor: '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
-          <Box sx={{ minWidth: 800 }}>
-            {/* Header Row */}
-            <Grid container sx={{ 
-              py: 1, 
-              borderBottom: 1, 
-              borderColor: 'rgba(0, 0, 0, 0.12)',
-              bgcolor: '#ffffff',
-              position: 'sticky',
-              top: 0,
-              zIndex: 1
-            }}>
-              <Grid item xs={1}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Image</Typography>
-              </Grid>
-              <Grid item xs={2}>
-                <Box 
-                  onClick={() => handleColumnClick('Artwork Title')}
-                  sx={{ 
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    '&:hover': { opacity: 0.8 }
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
-                    Title {getSortIcon('Artwork Title')}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={1}>
-                <Box 
-                  onClick={() => handleColumnClick('Mint Date')}
-                  sx={{ 
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    '&:hover': { opacity: 0.8 }
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
-                    Date {getSortIcon('Mint Date')}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={1}>
-                <Box 
-                  onClick={() => handleColumnClick('Type')}
-                  sx={{ 
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    '&:hover': { opacity: 0.8 }
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
-                    Type {getSortIcon('Type')}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={1}>
-                <Box 
-                  onClick={() => handleColumnClick('Edt Size')}
-                  sx={{ 
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    '&:hover': { opacity: 0.8 }
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
-                    Edition Size {getSortIcon('Edt Size')}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={2}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Platform</Typography>
-              </Grid>
-              <Grid item xs={2}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Collaborator/Special Type</Typography>
-              </Grid>
-              <Grid item xs={1}>
-                <Box 
-                  onClick={() => handleColumnClick('Price')}
-                  sx={{ 
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    '&:hover': { opacity: 0.8 }
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>
-                    Price {getSortIcon('Price')}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={1}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(0, 0, 0, 0.87)', fontWeight: 600 }}>Link</Typography>
-              </Grid>
-            </Grid>
-            
-            {/* Data Rows */}
-            {filteredNfts.map((nft, index) => (
-              <Grid container key={index} sx={{ 
-                py: 1, 
-                borderBottom: 1, 
-                borderColor: 'rgba(0, 0, 0, 0.12)',
-                bgcolor: '#ffffff',
-                '&:hover': { bgcolor: '#f5f5f5' }
-              }}>
-                <Grid item xs={1}>
-                  <Box sx={{ width: 60, height: 60 }}>
-                    <ImageWithFallback
-                      nft={nft}
-                      style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'cover',
-                        borderRadius: '4px'
+          {showFilters && (
+            <Box sx={{ mb: 2, p: 1.5, bgcolor: '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+              <Grid container spacing={1.5}>
+                <Grid item xs={12} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>Platform</InputLabel>
+                    <Select
+                      value={platformFilter}
+                      label="Platform"
+                      onChange={(e) => setPlatformFilter(e.target.value)}
+                      sx={{ 
+                        color: 'rgba(0, 0, 0, 0.87)',
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(0, 0, 0, 0.23)',
+                        },
                       }}
+                    >
+                      <MenuItem value="">All Platforms</MenuItem>
+                      {platforms.map((platform) => (
+                        <MenuItem key={platform} value={platform}>
+                          {platform}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>Type</InputLabel>
+                    <Select
+                      value={typeFilter}
+                      label="Type"
+                      onChange={(e) => setTypeFilter(e.target.value)}
+                      sx={{ 
+                        color: 'rgba(0, 0, 0, 0.87)',
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(0, 0, 0, 0.23)',
+                        },
+                      }}
+                    >
+                      <MenuItem value="">All Types</MenuItem>
+                      {types.map((type) => (
+                        <MenuItem key={type} value={type}>
+                          {type}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>Collaborator</InputLabel>
+                    <Select
+                      value={collaboratorFilter}
+                      label="Collaborator"
+                      onChange={(e) => setCollaboratorFilter(e.target.value)}
+                      sx={{ 
+                        color: 'rgba(0, 0, 0, 0.87)',
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(0, 0, 0, 0.23)',
+                        },
+                      }}
+                    >
+                      <MenuItem value="">All Collaborators</MenuItem>
+                      {collaborators.map((collaborator) => (
+                        <MenuItem key={collaborator} value={collaborator}>
+                          {collaborator}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Box display="flex" alignItems="center" height="100%">
+                    <Chip 
+                      label="Clear Filters" 
+                      onClick={clearFilters} 
+                      color="primary" 
+                      variant="outlined"
+                      sx={{ width: '100%' }}
                     />
                   </Box>
                 </Grid>
-                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body1" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {nft['Artwork Title'] || 'Untitled'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {nft['Mint Date']}
-                  </Typography>
-                </Grid>
-                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {nft.Type}
-                  </Typography>
-                </Grid>
-                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {nft['Edt Size']}
-                  </Typography>
-                </Grid>
-                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {nft['Platform']}
-                  </Typography>
-                </Grid>
-                <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {nft['Collaborator/Special Type']}
-                  </Typography>
-                </Grid>
-                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {nft.Price || 'N/A'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
-                  {nft.Link && (
+              </Grid>
+            </Box>
+          )}
+
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
+                Showing {filteredNfts.length} Artworks
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1}>
+              <Chip 
+                label="Unique" 
+                onClick={() => setTypeFilter(typeFilter === 'Unique' ? '' : 'Unique')}
+                sx={{
+                  color: typeFilter === 'Unique' ? 'primary.contrastText' : 'text.primary',
+                  backgroundColor: typeFilter === 'Unique' ? 'primary.main' : 'background.paper',
+                  borderColor: 'divider',
+                  '&:hover': {
+                    backgroundColor: typeFilter === 'Unique' ? 'primary.dark' : 'action.hover',
+                  },
+                }}
+                variant={typeFilter === 'Unique' ? 'filled' : 'outlined'}
+              />
+              <Chip 
+                label="Edition" 
+                onClick={() => setTypeFilter(typeFilter === 'Edition' ? '' : 'Edition')}
+                sx={{
+                  color: typeFilter === 'Edition' ? 'primary.contrastText' : 'text.primary',
+                  backgroundColor: typeFilter === 'Edition' ? 'primary.main' : 'background.paper',
+                  borderColor: 'divider',
+                  '&:hover': {
+                    backgroundColor: typeFilter === 'Edition' ? 'primary.dark' : 'action.hover',
+                  },
+                }}
+                variant={typeFilter === 'Edition' ? 'filled' : 'outlined'}
+              />
+              <Chip 
+                label="Generative" 
+                onClick={() => setTypeFilter(typeFilter === 'Generative' ? '' : 'Generative')}
+                sx={{
+                  color: typeFilter === 'Generative' ? 'primary.contrastText' : 'text.primary',
+                  backgroundColor: typeFilter === 'Generative' ? 'primary.main' : 'background.paper',
+                  borderColor: 'divider',
+                  '&:hover': {
+                    backgroundColor: typeFilter === 'Generative' ? 'primary.dark' : 'action.hover',
+                  },
+                }}
+                variant={typeFilter === 'Generative' ? 'filled' : 'outlined'}
+              />
+              <Chip 
+                label="Series" 
+                onClick={() => setTypeFilter(typeFilter === 'Series' ? '' : 'Series')}
+                sx={{
+                  color: typeFilter === 'Series' ? 'primary.contrastText' : 'text.primary',
+                  backgroundColor: typeFilter === 'Series' ? 'primary.main' : 'background.paper',
+                  borderColor: 'divider',
+                  '&:hover': {
+                    backgroundColor: typeFilter === 'Series' ? 'primary.dark' : 'action.hover',
+                  },
+                }}
+                variant={typeFilter === 'Series' ? 'filled' : 'outlined'}
+              />
+            </Stack>
+          </Box>
+        </Box>
+
+        {viewMode === 'gallery' ? (
+          <Box sx={{ width: '100%', bgcolor: darkMode ? '#23272f' : '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)', p: 2 }}>
+            <Grid container spacing={2}>
+              {filteredNfts.map((nft, index) => (
+                <Grid item xs={6} sm={4} md={3} lg={2} key={index}>
+                  <Card 
+                    sx={{ 
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      '&:hover': {
+                        transform: 'scale(1.02)',
+                        transition: 'transform 0.2s ease-in-out'
+                      }
+                    }}
+                  >
                     <Link 
                       href={nft.Link} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      sx={{ 
-                        color: '#1976d2',
-                        '&:hover': {
-                          color: '#1565c0',
-                        },
-                      }}
+                      sx={{ textDecoration: 'none', height: '100%' }}
                     >
-                      View
+                      <Box sx={{ position: 'relative', paddingTop: '100%', height: '100%' }}>
+                        <ImageWithFallback
+                          nft={nft}
+                          style={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                      </Box>
                     </Link>
-                  )}
+                  </Card>
                 </Grid>
-              </Grid>
-            ))}
+              ))}
+            </Grid>
           </Box>
-        </Box>
-      ) : (
-        <List sx={{ bgcolor: '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
-          {filteredNfts.map((nft, index) => (
-            <ListItem key={index} divider sx={{ borderColor: 'rgba(0, 0, 0, 0.12)' }}>
-              <Grid container alignItems="center">
-                <Grid item xs={2}>
-                  <ImageWithFallback
-                    nft={nft}
-                    style={{ width: '100%', height: 'auto' }}
-                  />
-                </Grid>
-                <Grid item xs={2}>
-                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Artwork Title']}</Typography>
-                </Grid>
+        ) : (
+          <Box sx={{ width: '100%', overflowX: 'auto', bgcolor: 'background.paper', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+            <Box sx={{ minWidth: 800 }}>
+              {/* Header Row */}
+              <Grid container sx={{ 
+                py: 1, 
+                borderBottom: 1, 
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+                position: 'sticky',
+                top: 0,
+                zIndex: 1
+              }}>
                 <Grid item xs={1}>
-                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Mint Date']}</Typography>
-                </Grid>
-                <Grid item xs={1}>
-                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Type']}</Typography>
-                </Grid>
-                <Grid item xs={1}>
-                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Edt Size']}</Typography>
+                  <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Image</Typography>
                 </Grid>
                 <Grid item xs={2}>
-                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Platform']}</Typography>
-                </Grid>
-                <Grid item xs={1}>
-                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft['Collaborator/Special Type']}</Typography>
-                </Grid>
-                <Grid item xs={1}>
-                  <Typography sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>{nft.Price || 'N/A'}</Typography>
-                </Grid>
-                <Grid item xs={1}>
-                  <Link 
-                    href={nft['Link']} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                  <Box 
+                    onClick={() => handleColumnClick('Artwork Title')}
                     sx={{ 
-                      color: '#1976d2',
-                      '&:hover': {
-                        color: '#1565c0',
-                      },
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      '&:hover': { opacity: 0.8 }
                     }}
                   >
-                    View
-                  </Link>
+                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                      Title {getSortIcon('Artwork Title')}
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={1}>
+                  <Box 
+                    onClick={() => handleColumnClick('Mint Date')}
+                    sx={{ 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      '&:hover': { opacity: 0.8 }
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                      Date {getSortIcon('Mint Date')}
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={1}>
+                  <Box 
+                    onClick={() => handleColumnClick('Type')}
+                    sx={{ 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      '&:hover': { opacity: 0.8 }
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                      Type {getSortIcon('Type')}
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={1}>
+                  <Box 
+                    onClick={() => handleColumnClick('Edt Size')}
+                    sx={{ 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      '&:hover': { opacity: 0.8 }
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                      Edition Size {getSortIcon('Edt Size')}
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Platform</Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Collaborator/Special Type</Typography>
+                </Grid>
+                <Grid item xs={1}>
+                  <Box 
+                    onClick={() => handleColumnClick('Price')}
+                    sx={{ 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      '&:hover': { opacity: 0.8 }
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                      Price {getSortIcon('Price')}
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={1}>
+                  <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Link</Typography>
                 </Grid>
               </Grid>
-            </ListItem>
-          ))}
-        </List>
-      )}
-    </Container>
+              
+              {/* Data Rows */}
+              {filteredNfts.map((nft, index) => (
+                <Grid container key={index} sx={{ 
+                  py: 1, 
+                  borderBottom: 1, 
+                  borderColor: 'divider',
+                  bgcolor: darkMode ? 'grey.900' : 'background.paper',
+                  '&:hover': { bgcolor: darkMode ? 'grey.800' : 'action.hover' }
+                }}>
+                  <Grid item xs={1}>
+                    <Link 
+                      href={nft.Link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      sx={{ display: 'block', width: 60, height: 60 }}
+                    >
+                      <ImageWithFallback
+                        nft={nft}
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover',
+                          borderRadius: '4px'
+                        }}
+                      />
+                    </Link>
+                  </Grid>
+                  <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="body1" sx={{ color: 'text.primary' }}>
+                      {nft['Artwork Title'] || 'Untitled'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                      {nft['Mint Date']}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                      {nft.Type}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                      {nft['Edt Size']}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                      {nft['Platform']}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                      {nft['Collaborator/Special Type']}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                      {nft.Price || 'N/A'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
+                    {nft.Link && (
+                      <Link 
+                        href={nft.Link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        sx={{ 
+                          color: '#1976d2',
+                          '&:hover': {
+                            color: '#1565c0',
+                          },
+                        }}
+                      >
+                        View
+                      </Link>
+                    )}
+                  </Grid>
+                </Grid>
+              ))}
+            </Box>
+          </Box>
+        )}
+      </Container>
+    </ThemeProvider>
   );
 }
 
