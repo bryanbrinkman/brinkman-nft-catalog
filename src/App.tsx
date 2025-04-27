@@ -513,7 +513,7 @@ function App() {
       <CssBaseline />
       <Container maxWidth="xl" sx={{ py: 2, bgcolor: 'background.default' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Box sx={{ mb: 2, width: '150px', height: 'auto', bgcolor: darkMode ? '#23272f' : '#fff', borderRadius: 2, border: '2px solid', borderColor: darkMode ? '#444' : '#ddd', p: 1 }}>
+          <Box sx={{ mb: 2, width: '150px', height: 'auto', bgcolor: darkMode ? '#23272f' : '#fff', borderRadius: 2, p: 1 }}>
             <img 
               src={darkMode ? "/brinkman-nft-catalog/catlogo_Darkmode.png" : "/brinkman-nft-catalog/catlogo.png"} 
               alt="Cat Logo" 
@@ -694,7 +694,7 @@ function App() {
 
           <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" sx={{ color: 'rgba(0, 0, 0, 0.87)' }}>
+              <Typography variant="body2" sx={{ color: darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)' }}>
                 Showing {filteredNfts.length} Artworks
               </Typography>
             </Box>
