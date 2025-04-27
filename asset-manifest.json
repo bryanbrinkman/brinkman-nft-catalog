@@ -1,10 +1,13 @@
 {
   "files": {
-    "main.js": "/brinkman-nft-catalog/static/js/main.a28bb9d5.js",
-    "index.html": "/brinkman-nft-catalog/index.html",
-    "main.a28bb9d5.js.map": "/brinkman-nft-catalog/static/js/main.a28bb9d5.js.map"
+    "main.css": "/nft-catalog/static/css/main.7fbca2b7.css",
+    "main.js": "/nft-catalog/static/js/main.1f74fbab.js",
+    "index.html": "/nft-catalog/index.html",
+    "main.7fbca2b7.css.map": "/nft-catalog/static/css/main.7fbca2b7.css.map",
+    "main.1f74fbab.js.map": "/nft-catalog/static/js/main.1f74fbab.js.map"
   },
   "entrypoints": [
-    "static/js/main.a28bb9d5.js"
+    "static/css/main.7fbca2b7.css",
+    "static/js/main.1f74fbab.js"
   ]
 }
