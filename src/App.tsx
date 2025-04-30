@@ -15,7 +15,6 @@ import {
   IconButton,
   Tooltip,
   Link,
-  Card,
   CssBaseline
 } from '@mui/material';
 import { 
@@ -28,9 +27,35 @@ import {
 } from '@mui/icons-material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Papa from 'papaparse';
+import 'react-lazy-load-image-component/src/effects/blur.css';
+import Masonry from 'react-masonry-css';
+import { Network, Alchemy } from "alchemy-sdk";
+
+// Add Masonry styles
+const masonryStyles = {
+  display: "flex",
+  width: "auto",
+  marginLeft: -4,
+  marginRight: -4,
+  "& .masonry-grid_column": {
+    paddingLeft: 4,
+    paddingRight: 4,
+    backgroundClip: "padding-box",
+    "& > *": {
+      marginBottom: 0
+    }
+  }
+};
 
 // Helper function to delay between API calls
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Add Alchemy settings
+const alchemySettings = {
+  apiKey: "5gwcGwhpJmXp-nH6tFvxQQINapw_PFZL",
+  network: Network.ETH_MAINNET,
+};
+const alchemy = new Alchemy(alchemySettings);
 
 interface NFT {
   'Artwork Title': string;
@@ -98,7 +123,7 @@ function App() {
 
   useEffect(() => {
     // Load CSV data
-    fetch('./Brinkman NFT Catalog - Sheet1 (10).csv')
+    fetch(`${process.env.PUBLIC_URL}/Brinkman NFT Catalog - Sheet1 (10).csv`)
       .then(response => response.text())
       .then(data => {
         Papa.parse(data, {
@@ -113,6 +138,10 @@ function App() {
             setLoading(false);
           }
         });
+      })
+      .catch(error => {
+        console.error('Error loading CSV:', error);
+        setLoading(false);
       });
   }, []);
 
@@ -181,42 +210,10 @@ function App() {
     // First try the direct image link if available
     if (nft['Image link']) {
       try {
-        const response = await fetch(nft['Image link'], { method: 'HEAD' });
-        if (response.ok) {
-          console.log('Direct image link found for:', nft['Artwork Title']);
-          return nft['Image link'];
-        }
+        // Skip the HEAD request and just return the image link directly
+        return nft['Image link'];
       } catch (error) {
-        console.warn('Error fetching from direct image link for:', nft['Artwork Title'], error);
-      }
-    }
-
-    // Then try OpenSea API if we have contract and token info
-    if (nft['Contract Hash'] && nft['TokenID Start']) {
-      try {
-        // Add a small delay to avoid rate limiting
-        await delay(100);
-        
-        const response = await fetch(
-          `https://api.opensea.io/api/v2/chain/ethereum/contract/${nft['Contract Hash']}/nfts/${nft['TokenID Start']}`,
-          {
-            headers: {
-              'Accept': 'application/json'
-            }
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.nft && data.nft.image_url) {
-            console.log('OpenSea image found for:', nft['Artwork Title']);
-            return data.nft.image_url;
-          }
-        } else {
-          console.warn('OpenSea API error for:', nft['Artwork Title'], await response.text());
-        }
-      } catch (error) {
-        console.error('Error fetching from OpenSea for:', nft['Artwork Title'], error);
+        console.warn('Error with direct image link for:', nft['Artwork Title'], error);
       }
     }
 
@@ -227,43 +224,8 @@ function App() {
         // Remove 'ipfs://' if present and any trailing slashes
         const cleanHash = ipfsHash.replace('ipfs://', '').replace(/\/+$/, '');
         
-        const gateways = [
-          'https://nftstorage.link/ipfs/',
-          'https://ipfs.io/ipfs/',
-          'https://gateway.pinata.cloud/ipfs/',
-          'https://dweb.link/ipfs/',
-          'https://gateway.ipfs.io/ipfs/',
-          'https://cloudflare-ipfs.com/ipfs/'
-        ];
-
-        // Try each gateway in sequence until one works
-        for (const gateway of gateways) {
-          try {
-            const url = `${gateway}${cleanHash}`;
-            // Test if the image is accessible with a timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-            const response = await fetch(url, { 
-              method: 'HEAD',
-              signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-
-            if (response.ok) {
-              console.log('IPFS image found at', gateway, 'for:', nft['Artwork Title']);
-              return url;
-            }
-          } catch (error: any) {
-            if (error.name === 'AbortError') {
-              console.warn('Gateway timeout:', gateway, 'for:', nft['Artwork Title']);
-            } else {
-              console.warn('Failed to load from gateway:', gateway, 'for:', nft['Artwork Title']);
-            }
-            continue;
-          }
-        }
+        // Use a reliable IPFS gateway
+        return `https://nftstorage.link/ipfs/${cleanHash}`;
       } catch (error) {
         console.error('Error processing IPFS image for:', nft['Artwork Title'], error);
       }
@@ -276,46 +238,10 @@ function App() {
       nft.Link.endsWith('.png') || 
       nft.Link.endsWith('.gif')
     )) {
-      try {
-        // Skip direct HEAD requests to OpenSea website URLs
-        if (nft.Link.includes('opensea.io/assets')) {
-          console.log('Skipping direct OpenSea website URL:', nft.Link);
-          // Try to get the image from OpenSea API instead
-          if (nft['Contract Hash'] && nft['TokenID Start']) {
-            try {
-              const response = await fetch(
-                `https://api.opensea.io/api/v2/chain/ethereum/contract/${nft['Contract Hash']}/nfts/${nft['TokenID Start']}`,
-                {
-                  headers: {
-                    'Accept': 'application/json'
-                  }
-                }
-              );
-
-              if (response.ok) {
-                const data = await response.json();
-                if (data.nft && data.nft.image_url) {
-                  console.log('OpenSea API image found for:', nft['Artwork Title']);
-                  return data.nft.image_url;
-                }
-              }
-            } catch (error) {
-              console.warn('OpenSea API error for:', nft['Artwork Title'], error);
-            }
-          }
-        } else {
-          // For non-OpenSea URLs, try the direct link
-          const response = await fetch(nft.Link, { method: 'HEAD' });
-          if (response.ok) {
-            console.log('Direct link image found for:', nft['Artwork Title']);
-            return nft.Link;
-          }
-        }
-      } catch (error) {
-        console.warn('Error fetching from direct link for:', nft['Artwork Title'], error);
-      }
+      return nft.Link;
     }
 
+    // Fallback to placeholder
     console.warn('No valid image found for:', nft['Artwork Title']);
     return 'https://via.placeholder.com/300x300?text=No+Image';
   };
@@ -400,55 +326,47 @@ function App() {
     setSortOrder('desc');
   };
 
-  // Updated price fetching function with better error handling
-  const fetchOpenSeaPrice = useCallback(async (contractAddress: string, tokenId: string): Promise<string> => {
+  // Updated price fetching function using Alchemy
+  const fetchOpenSeaPrice = useCallback(async (contractAddress: string, tokenIdStart: string): Promise<string> => {
     try {
+      // Skip price fetching for SuperRare pieces
+      if (contractAddress.toLowerCase() === "0xb932a70a57673d89f4acffbe830e8ed7f75fb9e0") {
+        return 'N/A';
+      }
+
       await delay(100); // Rate limiting delay
       
-      // Get collection info from the NFT data
-      const nftWithCollection = nfts.find(nft => 
-        nft['Contract Hash']?.toLowerCase() === contractAddress.toLowerCase() &&
-        nft['Collection Name']
-      );
-
-      if (!nftWithCollection || !nftWithCollection['Collection Name']) {
-        console.warn('No collection name found for:', contractAddress);
-        return 'Not Listed';
-      }
-
-      // Convert collection name to slug format
-      const collectionSlug = nftWithCollection['Collection Name']
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
-        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
-
-      console.log('Trying collection slug:', collectionSlug);
-
-      // Get the collection stats which includes floor price
-      const statsResponse = await fetch(
-        `https://api.opensea.io/api/v1/collection/${collectionSlug}/stats`
-      );
-
-      if (!statsResponse.ok) {
-        console.warn('Could not fetch collection stats:', await statsResponse.text());
-        return 'Not Listed';
-      }
-
-      const statsData = await statsResponse.json();
-      console.log('Collection stats:', statsData);
+      console.log('Fetching price for:', contractAddress, tokenIdStart);
       
-      const floorPrice = statsData.stats?.floor_price;
-
-      if (floorPrice) {
-        return `${floorPrice.toFixed(3)} ETH (Floor)`;
+      // Get NFT metadata from Alchemy
+      const nft = await alchemy.nft.getNftMetadata(contractAddress, tokenIdStart);
+      
+      if (!nft) {
+        console.warn('No NFT metadata found for:', contractAddress, tokenIdStart);
+        return 'Not Listed';
       }
 
+      // Get floor price from Alchemy
+      const floorPrice = await alchemy.nft.getFloorPrice(contractAddress);
+      console.log('Floor price response:', floorPrice);
+      
+      if (floorPrice && 
+          'openSea' in floorPrice && 
+          floorPrice.openSea && 
+          typeof floorPrice.openSea === 'object' &&
+          'floorPrice' in floorPrice.openSea) {
+        const price = floorPrice.openSea.floorPrice;
+        console.log('Found price:', price);
+        return `${price} ETH (Floor)`;
+      }
+
+      console.log('No floor price found');
       return 'Not Listed';
     } catch (error) {
       console.error('Error fetching price:', error);
       return 'Error';
     }
-  }, [nfts]);
+  }, []);
 
   // Function to fetch all prices
   const fetchAllPrices = useCallback(async () => {
@@ -466,13 +384,19 @@ function App() {
       const nft = nfts[i];
       if (nft['Contract Hash'] && nft['TokenID Start']) {
         try {
-          const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start']);
+          console.log('Processing NFT:', nft['Artwork Title'], nft['Contract Hash'], nft['TokenID Start']);
+          const price = await fetchOpenSeaPrice(
+            nft['Contract Hash'], 
+            nft['TokenID Start']
+          );
           if (price !== 'Error') {
             updatedNfts[i] = { ...nft, Price: price };
             hasChanges = true;
             successCount++;
+            console.log('Updated price for:', nft['Artwork Title'], price);
           } else {
             errorCount++;
+            console.log('Failed to get price for:', nft['Artwork Title']);
           }
         } catch (error) {
           console.error('Error updating price for:', nft['Artwork Title'], error);
@@ -484,6 +408,8 @@ function App() {
     if (hasChanges) {
       console.log(`Price update complete. Success: ${successCount}, Errors: ${errorCount}`);
       setNfts(updatedNfts);
+    } else {
+      console.log('No price updates were made');
     }
     
     setIsPriceLoading(false);
@@ -492,13 +418,28 @@ function App() {
   // Set up periodic price refresh
   useEffect(() => {
     // Initial price fetch
+    console.log('Starting initial price fetch');
     fetchAllPrices();
 
     // Set up interval for periodic updates
-    const interval = setInterval(fetchAllPrices, 5 * 60 * 1000); // Update every 5 minutes
+    const interval = setInterval(() => {
+      console.log('Starting periodic price update');
+      fetchAllPrices();
+    }, 5 * 60 * 1000); // Update every 5 minutes
 
     return () => clearInterval(interval);
   }, [fetchAllPrices]);
+
+  const breakpointColumns = {
+    default: 8,
+    2400: 7,
+    2000: 6,
+    1600: 5,
+    1200: 4,
+    900: 3,
+    600: 2,
+    400: 1
+  };
 
   if (loading) {
     return (
@@ -513,7 +454,7 @@ function App() {
       <CssBaseline />
       <Container maxWidth="xl" sx={{ py: 2, bgcolor: 'background.default' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Box sx={{ mb: 2, width: '150px', height: 'auto', bgcolor: darkMode ? '#23272f' : '#fff', borderRadius: 2, p: 1 }}>
+          <Box sx={{ mb: 2, width: '150px', height: 'auto' }}>
             <img 
               src={darkMode ? "/brinkman-nft-catalog/catlogo_Darkmode.png" : "/brinkman-nft-catalog/catlogo.png"} 
               alt="Cat Logo" 
@@ -703,11 +644,13 @@ function App() {
                 label="Unique" 
                 onClick={() => setTypeFilter(typeFilter === 'Unique' ? '' : 'Unique')}
                 sx={{
-                  color: typeFilter === 'Unique' ? 'primary.contrastText' : 'text.primary',
-                  backgroundColor: typeFilter === 'Unique' ? 'primary.main' : 'background.paper',
-                  borderColor: 'divider',
+                  color: typeFilter === 'Unique' ? '#fff' : '#f2668b',
+                  backgroundColor: typeFilter === 'Unique' ? '#f2668b' : 'transparent',
+                  borderColor: '#f2668b',
+                  transition: 'all 0.2s ease-in-out',
                   '&:hover': {
-                    backgroundColor: typeFilter === 'Unique' ? 'primary.dark' : 'action.hover',
+                    backgroundColor: typeFilter === 'Unique' ? '#f2668b' : 'rgba(242, 102, 139, 0.15)',
+                    transform: 'scale(1.05)'
                   },
                 }}
                 variant={typeFilter === 'Unique' ? 'filled' : 'outlined'}
@@ -716,11 +659,13 @@ function App() {
                 label="Edition" 
                 onClick={() => setTypeFilter(typeFilter === 'Edition' ? '' : 'Edition')}
                 sx={{
-                  color: typeFilter === 'Edition' ? 'primary.contrastText' : 'text.primary',
-                  backgroundColor: typeFilter === 'Edition' ? 'primary.main' : 'background.paper',
-                  borderColor: 'divider',
+                  color: typeFilter === 'Edition' ? '#fff' : '#23c7d9',
+                  backgroundColor: typeFilter === 'Edition' ? '#23c7d9' : 'transparent',
+                  borderColor: '#23c7d9',
+                  transition: 'all 0.2s ease-in-out',
                   '&:hover': {
-                    backgroundColor: typeFilter === 'Edition' ? 'primary.dark' : 'action.hover',
+                    backgroundColor: typeFilter === 'Edition' ? '#23c7d9' : 'rgba(35, 199, 217, 0.15)',
+                    transform: 'scale(1.05)'
                   },
                 }}
                 variant={typeFilter === 'Edition' ? 'filled' : 'outlined'}
@@ -729,11 +674,13 @@ function App() {
                 label="Generative" 
                 onClick={() => setTypeFilter(typeFilter === 'Generative' ? '' : 'Generative')}
                 sx={{
-                  color: typeFilter === 'Generative' ? 'primary.contrastText' : 'text.primary',
-                  backgroundColor: typeFilter === 'Generative' ? 'primary.main' : 'background.paper',
-                  borderColor: 'divider',
+                  color: typeFilter === 'Generative' ? '#fff' : '#48d9a4',
+                  backgroundColor: typeFilter === 'Generative' ? '#48d9a4' : 'transparent',
+                  borderColor: '#48d9a4',
+                  transition: 'all 0.2s ease-in-out',
                   '&:hover': {
-                    backgroundColor: typeFilter === 'Generative' ? 'primary.dark' : 'action.hover',
+                    backgroundColor: typeFilter === 'Generative' ? '#48d9a4' : 'rgba(72, 217, 164, 0.15)',
+                    transform: 'scale(1.05)'
                   },
                 }}
                 variant={typeFilter === 'Generative' ? 'filled' : 'outlined'}
@@ -742,11 +689,13 @@ function App() {
                 label="Series" 
                 onClick={() => setTypeFilter(typeFilter === 'Series' ? '' : 'Series')}
                 sx={{
-                  color: typeFilter === 'Series' ? 'primary.contrastText' : 'text.primary',
-                  backgroundColor: typeFilter === 'Series' ? 'primary.main' : 'background.paper',
-                  borderColor: 'divider',
+                  color: typeFilter === 'Series' ? '#fff' : '#f2bf27',
+                  backgroundColor: typeFilter === 'Series' ? '#f2bf27' : 'transparent',
+                  borderColor: '#f2bf27',
+                  transition: 'all 0.2s ease-in-out',
                   '&:hover': {
-                    backgroundColor: typeFilter === 'Series' ? 'primary.dark' : 'action.hover',
+                    backgroundColor: typeFilter === 'Series' ? '#f2bf27' : 'rgba(242, 191, 39, 0.15)',
+                    transform: 'scale(1.05)'
                   },
                 }}
                 variant={typeFilter === 'Series' ? 'filled' : 'outlined'}
@@ -756,61 +705,75 @@ function App() {
         </Box>
 
         {viewMode === 'gallery' ? (
-          <Box sx={{ width: '100%', bgcolor: darkMode ? '#23272f' : '#ffffff', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)', p: 2 }}>
-            <Grid container spacing={2}>
-              {filteredNfts.map((nft, index) => (
-                <Grid item xs={6} sm={4} md={3} lg={2} key={index}>
-                  <Card 
-                    sx={{ 
+          <Masonry
+            breakpointCols={breakpointColumns}
+            className="masonry-grid"
+            columnClassName="masonry-grid_column"
+            style={masonryStyles}
+          >
+            {filteredNfts.map((nft) => (
+              <Link 
+                key={nft['Artwork Title']}
+                href={nft.Link} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                sx={{ 
+                  display: 'block',
+                  mb: 0,
+                  overflow: 'hidden',
+                  borderRadius: 0,
+                  transition: 'transform 0.3s ease-in-out',
+                  '&:hover': {
+                    transform: 'scale(1.02)',
+                  }
+                }}
+              >
+                <Box sx={{ 
+                  position: 'relative', 
+                  paddingTop: '100%', 
+                  overflow: 'hidden',
+                  backgroundColor: darkMode ? 'grey.900' : 'grey.100'
+                }}>
+                  <ImageWithFallback
+                    nft={nft}
+                    style={{ 
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
                       height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      '&:hover': {
-                        transform: 'scale(1.02)',
-                        transition: 'transform 0.2s ease-in-out'
-                      }
+                      objectFit: 'cover',
+                      transition: 'transform 0.3s ease-in-out'
                     }}
-                  >
-                    <Link 
-                      href={nft.Link} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      sx={{ textDecoration: 'none', height: '100%' }}
-                    >
-                      <Box sx={{ position: 'relative', paddingTop: '100%', height: '100%' }}>
-                        <ImageWithFallback
-                          nft={nft}
-                          style={{ 
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover'
-                          }}
-                        />
-                      </Box>
-                    </Link>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
+                  />
+                </Box>
+              </Link>
+            ))}
+          </Masonry>
         ) : (
-          <Box sx={{ width: '100%', overflowX: 'auto', bgcolor: 'background.paper', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+          <Box sx={{ 
+            width: '100%', 
+            overflowX: 'auto', 
+            bgcolor: 'background.paper', 
+            borderRadius: 2,
+            boxShadow: darkMode 
+              ? '0 4px 12px rgba(0,0,0,0.2)' 
+              : '0 4px 12px rgba(0,0,0,0.05)'
+          }}>
             <Box sx={{ minWidth: 800 }}>
               {/* Header Row */}
               <Grid container sx={{ 
-                py: 1, 
+                py: 2, 
+                px: 2,
                 borderBottom: 1, 
                 borderColor: 'divider',
-                bgcolor: 'background.paper',
+                bgcolor: darkMode ? 'grey.900' : 'grey.50',
                 position: 'sticky',
                 top: 0,
                 zIndex: 1
               }}>
                 <Grid item xs={1}>
-                  <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Image</Typography>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 600 }}>Image</Typography>
                 </Grid>
                 <Grid item xs={2}>
                   <Box 
@@ -822,7 +785,7 @@ function App() {
                       '&:hover': { opacity: 0.8 }
                     }}
                   >
-                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
                       Title {getSortIcon('Artwork Title')}
                     </Typography>
                   </Box>
@@ -837,7 +800,7 @@ function App() {
                       '&:hover': { opacity: 0.8 }
                     }}
                   >
-                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
                       Date {getSortIcon('Mint Date')}
                     </Typography>
                   </Box>
@@ -852,7 +815,7 @@ function App() {
                       '&:hover': { opacity: 0.8 }
                     }}
                   >
-                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
                       Type {getSortIcon('Type')}
                     </Typography>
                   </Box>
@@ -867,16 +830,16 @@ function App() {
                       '&:hover': { opacity: 0.8 }
                     }}
                   >
-                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
                       Edition Size {getSortIcon('Edt Size')}
                     </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={2}>
-                  <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Platform</Typography>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 600 }}>Platform</Typography>
                 </Grid>
                 <Grid item xs={2}>
-                  <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Collaborator/Special Type</Typography>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 600 }}>Collaborator/Special Type</Typography>
                 </Grid>
                 <Grid item xs={1}>
                   <Box 
@@ -888,75 +851,124 @@ function App() {
                       '&:hover': { opacity: 0.8 }
                     }}
                   >
-                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
                       Price {getSortIcon('Price')}
                     </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={1}>
-                  <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Link</Typography>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 600 }}>Link</Typography>
                 </Grid>
               </Grid>
               
               {/* Data Rows */}
               {filteredNfts.map((nft, index) => (
                 <Grid container key={index} sx={{ 
-                  py: 1, 
+                  py: 1.5, 
+                  px: 2,
                   borderBottom: 1, 
                   borderColor: 'divider',
                   bgcolor: darkMode ? 'grey.900' : 'background.paper',
-                  '&:hover': { bgcolor: darkMode ? 'grey.800' : 'action.hover' }
+                  '&:hover': { 
+                    bgcolor: darkMode ? 'grey.800' : 'grey.50',
+                    transition: 'background-color 0.2s ease'
+                  }
                 }}>
                   <Grid item xs={1}>
                     <Link 
                       href={nft.Link} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      sx={{ display: 'block', width: 60, height: 60 }}
+                      sx={{ 
+                        display: 'block', 
+                        width: 60, 
+                        height: 60,
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                        transition: 'transform 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.05)'
+                        }
+                      }}
                     >
                       <ImageWithFallback
                         nft={nft}
                         style={{ 
                           width: '100%', 
                           height: '100%', 
-                          objectFit: 'cover',
-                          borderRadius: '4px'
+                          objectFit: 'cover'
                         }}
                       />
                     </Link>
                   </Grid>
                   <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body1" sx={{ color: 'text.primary' }}>
+                    <Typography 
+                      variant="body1" 
+                      sx={{ 
+                        color: 'text.primary',
+                        fontWeight: 500,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
                       {nft['Artwork Title'] || 'Untitled'}
                     </Typography>
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                       {nft['Mint Date']}
                     </Typography>
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                      {nft.Type}
-                    </Typography>
+                    <Chip 
+                      label={nft.Type} 
+                      size="small"
+                      sx={{ 
+                        color: nft.Type === 'Unique' ? '#fff' : 
+                               nft.Type === 'Edition' ? '#fff' : 
+                               nft.Type === 'Generative' ? '#fff' : 
+                               nft.Type === 'Series' ? '#fff' : 'text.primary',
+                        backgroundColor: nft.Type === 'Unique' ? '#f2668b' : 
+                                       nft.Type === 'Edition' ? '#23c7d9' : 
+                                       nft.Type === 'Generative' ? '#48d9a4' : 
+                                       nft.Type === 'Series' ? '#f2bf27' : 
+                                       darkMode ? 'grey.800' : 'grey.100',
+                        borderColor: nft.Type === 'Unique' ? '#f2668b' : 
+                                   nft.Type === 'Edition' ? '#23c7d9' : 
+                                   nft.Type === 'Generative' ? '#48d9a4' : 
+                                   nft.Type === 'Series' ? '#f2bf27' : 'divider',
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          transform: 'scale(1.05)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                    />
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                       {nft['Edt Size']}
                     </Typography>
                   </Grid>
                   <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                       {nft['Platform']}
                     </Typography>
                   </Grid>
                   <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                       {nft['Collaborator/Special Type']}
                     </Typography>
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: nft.Price ? 'success.main' : 'text.secondary',
+                        fontWeight: nft.Price ? 500 : 400
+                      }}
+                    >
                       {nft.Price || 'N/A'}
                     </Typography>
                   </Grid>
@@ -967,10 +979,11 @@ function App() {
                         target="_blank" 
                         rel="noopener noreferrer"
                         sx={{ 
-                          color: '#1976d2',
+                          color: 'primary.main',
+                          textDecoration: 'none',
                           '&:hover': {
-                            color: '#1565c0',
-                          },
+                            textDecoration: 'underline'
+                          }
                         }}
                       >
                         View

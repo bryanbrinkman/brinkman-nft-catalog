@@ -2,12 +2,13 @@
   "name": "brinkman-nft-catalog",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://bryanbrinkman.github.io/brinkman-nft-catalog",
+  "homepage": "https://brinkman-nft-catalog.github.io/brinkman-nft-catalog",
   "dependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.11.16",
     "@mui/material": "^5.13.0",
+    "alchemy-sdk": "^3.5.7",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
@@ -15,6 +16,8 @@
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-lazy-load-image-component": "^1.6.3",
+    "react-masonry-css": "^1.0.16",
     "react-scripts": "5.0.1",
     "typescript": "^4.9.5"
   },
@@ -50,6 +53,7 @@
     "@types/papaparse": "^5.3.7",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@types/react-lazy-load-image-component": "^1.6.4",
     "gh-pages": "^6.3.0"
   },
   "engines": {
