@@ -98,7 +98,7 @@ function App() {
 
   useEffect(() => {
     // Load CSV data
-    fetch('./Brinkman NFT Catalog - Sheet1 (10).csv')
+    fetch('./Brinkman NFT Catalog _062325.csv')
       .then(response => response.text())
       .then(data => {
         Papa.parse(data, {
