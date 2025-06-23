@@ -71,6 +71,7 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [showFilters, setShowFilters] = useState(false);
   const [isPriceLoading, setIsPriceLoading] = useState<boolean>(false);
+  const [prices, setPrices] = useState<Record<string, string>>({});
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
@@ -147,8 +148,20 @@ function App() {
 
     // Apply sorting
     filtered.sort((a, b) => {
-      const aValue = a[sortField] || '';
-      const bValue = b[sortField] || '';
+      let aValue = a[sortField] || '';
+      let bValue = b[sortField] || '';
+      
+      // Handle price sorting with separate prices state
+      if (sortField === 'Price') {
+        const aPrice = prices[`${a['Contract Hash']}-${a['TokenID Start']}`] || '';
+        const bPrice = prices[`${b['Contract Hash']}-${b['TokenID Start']}`] || '';
+        
+        // Extract numeric values from price strings (e.g., "2.5 ETH (Floor)" -> 2.5)
+        const aNum = parseFloat(aPrice.match(/[\d.]+/)?.[0] || '0');
+        const bNum = parseFloat(bPrice.match(/[\d.]+/)?.[0] || '0');
+        
+        return sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+      }
       
       if (sortField === 'Mint Date') {
         // Convert dates to timestamps for proper sorting
@@ -171,7 +184,7 @@ function App() {
     });
 
     setFilteredNfts(filtered);
-  }, [searchTerm, platformFilter, typeFilter, collaboratorFilter, nfts, sortField, sortOrder]);
+  }, [searchTerm, platformFilter, typeFilter, collaboratorFilter, nfts, sortField, sortOrder, prices]);
 
   const platforms = [...new Set(nfts.map(nft => nft.Platform))].filter(Boolean);
   const types = [...new Set(nfts.map(nft => nft.Type))].filter(Boolean);
@@ -326,6 +339,9 @@ function App() {
     const [errorCount, setErrorCount] = useState(0);
     const maxRetries = 3;
     
+    // Use a stable key based on NFT identifier to prevent unnecessary re-renders
+    const nftKey = `${nft['Contract Hash']}-${nft['TokenID Start']}-${nft['Artwork Title']}`;
+    
     useEffect(() => {
       let isMounted = true;
       
@@ -348,7 +364,7 @@ function App() {
       return () => {
         isMounted = false;
       };
-    }, [nft]);
+    }, [nftKey]); // Only depend on the stable key, not the entire nft object
 
     const handleError = async () => {
       console.warn('Image load error for:', nft['Artwork Title'], 'attempt:', errorCount + 1);
@@ -457,8 +473,7 @@ function App() {
     setIsPriceLoading(true);
     console.log('Starting price fetch for', nfts.length, 'artworks');
     
-    const updatedNfts = [...nfts];
-    let hasChanges = false;
+    const updatedPrices: Record<string, string> = {};
     let successCount = 0;
     let errorCount = 0;
 
@@ -468,8 +483,8 @@ function App() {
         try {
           const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start']);
           if (price !== 'Error') {
-            updatedNfts[i] = { ...nft, Price: price };
-            hasChanges = true;
+            const nftKey = `${nft['Contract Hash']}-${nft['TokenID Start']}`;
+            updatedPrices[nftKey] = price;
             successCount++;
           } else {
             errorCount++;
@@ -481,9 +496,9 @@ function App() {
       }
     }
 
-    if (hasChanges) {
+    if (Object.keys(updatedPrices).length > 0) {
       console.log(`Price update complete. Success: ${successCount}, Errors: ${errorCount}`);
-      setNfts(updatedNfts);
+      setPrices(prev => ({ ...prev, ...updatedPrices }));
     }
     
     setIsPriceLoading(false);
@@ -491,13 +506,13 @@ function App() {
 
   // Set up periodic price refresh
   useEffect(() => {
-    // Initial price fetch
-    fetchAllPrices();
+    // Initial price fetch - disabled to prevent flickering
+    // fetchAllPrices();
 
-    // Set up interval for periodic updates
-    const interval = setInterval(fetchAllPrices, 5 * 60 * 1000); // Update every 5 minutes
+    // Set up interval for periodic updates - disabled to prevent flickering
+    // const interval = setInterval(fetchAllPrices, 5 * 60 * 1000); // Update every 5 minutes
 
-    return () => clearInterval(interval);
+    // return () => clearInterval(interval);
   }, [fetchAllPrices]);
 
   if (loading) {
@@ -957,7 +972,7 @@ function App() {
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                     <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                      {nft.Price || 'N/A'}
+                      {prices[`${nft['Contract Hash']}-${nft['TokenID Start']}`] || 'N/A'}
                     </Typography>
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
