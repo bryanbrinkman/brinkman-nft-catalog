@@ -417,47 +417,34 @@ function App() {
     setSortOrder('desc');
   };
 
-  // Updated price fetching function with better error handling
+  // Updated price fetching function using Alchemy API
   const fetchOpenSeaPrice = useCallback(async (contractAddress: string, tokenId: string): Promise<string> => {
     try {
       await delay(100); // Rate limiting delay
       
-      // Get collection info from the NFT data
-      const nftWithCollection = nfts.find(nft => 
-        nft['Contract Hash']?.toLowerCase() === contractAddress.toLowerCase() &&
-        nft['Collection Name']
+      // Use Alchemy API to get floor price
+      const alchemyApiKey = '5gwcGwhpJmXp-nH6tFvxQQINapw_PFZL';
+      const response = await fetch(
+        `https://eth-mainnet.g.alchemy.com/nft/v3/${alchemyApiKey}/getFloorPrice?contractAddress=${contractAddress}`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          }
+        }
       );
 
-      if (!nftWithCollection || !nftWithCollection['Collection Name']) {
-        console.warn('No collection name found for:', contractAddress);
+      if (!response.ok) {
+        console.warn('Alchemy API error:', await response.text());
         return 'Not Listed';
       }
 
-      // Convert collection name to slug format
-      const collectionSlug = nftWithCollection['Collection Name']
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
-        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
-
-      console.log('Trying collection slug:', collectionSlug);
-
-      // Get the collection stats which includes floor price
-      const statsResponse = await fetch(
-        `https://api.opensea.io/api/v1/collection/${collectionSlug}/stats`
-      );
-
-      if (!statsResponse.ok) {
-        console.warn('Could not fetch collection stats:', await statsResponse.text());
-        return 'Not Listed';
-      }
-
-      const statsData = await statsResponse.json();
-      console.log('Collection stats:', statsData);
+      const data = await response.json();
+      console.log('Alchemy floor price data:', data);
       
-      const floorPrice = statsData.stats?.floor_price;
-
-      if (floorPrice) {
-        return `${floorPrice.toFixed(3)} ETH (Floor)`;
+      if (data.openSea && data.openSea.floorPrice) {
+        const floorPrice = data.openSea.floorPrice;
+        return `${floorPrice} ETH (Floor)`;
       }
 
       return 'Not Listed';
@@ -465,7 +452,7 @@ function App() {
       console.error('Error fetching price:', error);
       return 'Error';
     }
-  }, [nfts]);
+  }, []);
 
   // Function to fetch all prices
   const fetchAllPrices = useCallback(async () => {
