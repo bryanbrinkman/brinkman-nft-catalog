@@ -194,6 +194,10 @@ function App() {
   const getImageUrl = async (nft: NFT): Promise<string> => {
     // First try the direct image link if available
     if (nft['Image link']) {
+      // For 'Machine' and similar cases, just return the direct link and let the browser handle errors
+      if (nft['Artwork Title'] === 'Machine') {
+        return nft['Image link'];
+      }
       try {
         const response = await fetch(nft['Image link'], { method: 'HEAD' });
         if (response.ok) {
