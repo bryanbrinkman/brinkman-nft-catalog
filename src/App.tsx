@@ -422,36 +422,66 @@ function App() {
   };
 
   // Updated price fetching function using Alchemy API
-  const fetchOpenSeaPrice = useCallback(async (contractAddress: string, tokenId: string): Promise<string> => {
+  const fetchOpenSeaPrice = useCallback(async (contractAddress: string, tokenId: string, isUnique: boolean = false): Promise<string> => {
     try {
       await delay(100); // Rate limiting delay
       
-      // Use Alchemy API to get floor price
       const alchemyApiKey = '5gwcGwhpJmXp-nH6tFvxQQINapw_PFZL';
-      const response = await fetch(
-        `https://eth-mainnet.g.alchemy.com/nft/v3/${alchemyApiKey}/getFloorPrice?contractAddress=${contractAddress}`,
-        {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
+      
+      if (isUnique) {
+        // For Unique pieces, fetch the specific token's listing price
+        const response = await fetch(
+          `https://eth-mainnet.g.alchemy.com/nft/v3/${alchemyApiKey}/getNFTMetadata?contractAddress=${contractAddress}&tokenId=${tokenId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            }
           }
-        }
-      );
+        );
 
-      if (!response.ok) {
-        console.warn('Alchemy API error:', await response.text());
+        if (!response.ok) {
+          console.warn('Alchemy API error for token:', await response.text());
+          return 'Not Listed';
+        }
+
+        const data = await response.json();
+        console.log('Alchemy token metadata:', data);
+        
+        // Check if the token is listed for sale
+        if (data.openSea && data.openSea.floorPrice) {
+          const price = data.openSea.floorPrice;
+          return `${price} ETH (Listed)`;
+        }
+        
+        return 'Not Listed';
+      } else {
+        // For editions/generative, fetch collection floor price
+        const response = await fetch(
+          `https://eth-mainnet.g.alchemy.com/nft/v3/${alchemyApiKey}/getFloorPrice?contractAddress=${contractAddress}`,
+          {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            }
+          }
+        );
+
+        if (!response.ok) {
+          console.warn('Alchemy API error:', await response.text());
+          return 'Not Listed';
+        }
+
+        const data = await response.json();
+        console.log('Alchemy floor price data:', data);
+        
+        if (data.openSea && data.openSea.floorPrice) {
+          const floorPrice = data.openSea.floorPrice;
+          return `${floorPrice} ETH (Floor)`;
+        }
+
         return 'Not Listed';
       }
-
-      const data = await response.json();
-      console.log('Alchemy floor price data:', data);
-      
-      if (data.openSea && data.openSea.floorPrice) {
-        const floorPrice = data.openSea.floorPrice;
-        return `${floorPrice} ETH (Floor)`;
-      }
-
-      return 'Not Listed';
     } catch (error) {
       console.error('Error fetching price:', error);
       return 'Error';
@@ -468,21 +498,13 @@ function App() {
     const updatedPrices: Record<string, string> = {};
     let successCount = 0;
     let errorCount = 0;
-    let skippedCount = 0;
 
     for (let i = 0; i < nfts.length; i++) {
       const nft = nfts[i];
       
-      // Skip "Unique" pieces as they don't have floor prices
-      if (nft['Type'] === 'Unique') {
-        console.log('Skipping Unique piece:', nft['Artwork Title']);
-        skippedCount++;
-        continue;
-      }
-      
       if (nft['Contract Hash'] && nft['TokenID Start']) {
         try {
-          const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start']);
+          const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start'], nft['Type'] === 'Unique');
           if (price !== 'Error') {
             const nftKey = `${nft['Contract Hash']}-${nft['TokenID Start']}`;
             updatedPrices[nftKey] = price;
@@ -498,7 +520,7 @@ function App() {
     }
 
     if (Object.keys(updatedPrices).length > 0) {
-      console.log(`Price update complete. Success: ${successCount}, Errors: ${errorCount}, Skipped: ${skippedCount}`);
+      console.log(`Price update complete. Success: ${successCount}, Errors: ${errorCount}`);
       setPrices(prev => ({ ...prev, ...updatedPrices }));
     }
     
@@ -1000,7 +1022,7 @@ function App() {
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                     <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                      {nft['Type'] === 'Unique' ? 'Unique' : (prices[`${nft['Contract Hash']}-${nft['TokenID Start']}`] || 'N/A')}
+                      {prices[`${nft['Contract Hash']}-${nft['TokenID Start']}`] || 'N/A'}
                     </Typography>
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
