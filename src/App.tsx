@@ -24,7 +24,8 @@ import {
   ViewComfy as GalleryIcon,
   Search as SearchIcon,
   Brightness4 as Brightness4Icon,
-  Brightness7 as Brightness7Icon
+  Brightness7 as Brightness7Icon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Papa from 'papaparse';
@@ -615,6 +616,20 @@ function App() {
                       {darkMode ? <Brightness7Icon /> : <Brightness4Icon />}
                     </IconButton>
                   </Tooltip>
+                  <Tooltip title="Refresh Prices">
+                    <IconButton 
+                      onClick={fetchAllPrices}
+                      disabled={isPriceLoading}
+                      sx={{ 
+                        color: isPriceLoading ? 'rgba(0, 0, 0, 0.38)' : darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                        '&:hover': {
+                          color: isPriceLoading ? 'rgba(0, 0, 0, 0.38)' : '#1976d2'
+                        }
+                      }}
+                    >
+                      <RefreshIcon />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               </Grid>
             </Grid>
@@ -712,6 +727,19 @@ function App() {
               <Typography variant="body2" sx={{ color: darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)' }}>
                 Showing {filteredNfts.length} Artworks
               </Typography>
+              {isPriceLoading && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <CircularProgress size={16} />
+                  <Typography variant="body2" sx={{ color: darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)' }}>
+                    Loading prices...
+                  </Typography>
+                </Box>
+              )}
+              {!isPriceLoading && Object.keys(prices).length > 0 && (
+                <Typography variant="body2" sx={{ color: darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)' }}>
+                  • {Object.keys(prices).length} prices loaded
+                </Typography>
+              )}
             </Box>
             <Stack direction="row" spacing={1}>
               <Chip 
