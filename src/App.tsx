@@ -468,9 +468,18 @@ function App() {
     const updatedPrices: Record<string, string> = {};
     let successCount = 0;
     let errorCount = 0;
+    let skippedCount = 0;
 
     for (let i = 0; i < nfts.length; i++) {
       const nft = nfts[i];
+      
+      // Skip "Unique" pieces as they don't have floor prices
+      if (nft['Type'] === 'Unique') {
+        console.log('Skipping Unique piece:', nft['Artwork Title']);
+        skippedCount++;
+        continue;
+      }
+      
       if (nft['Contract Hash'] && nft['TokenID Start']) {
         try {
           const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start']);
@@ -489,7 +498,7 @@ function App() {
     }
 
     if (Object.keys(updatedPrices).length > 0) {
-      console.log(`Price update complete. Success: ${successCount}, Errors: ${errorCount}`);
+      console.log(`Price update complete. Success: ${successCount}, Errors: ${errorCount}, Skipped: ${skippedCount}`);
       setPrices(prev => ({ ...prev, ...updatedPrices }));
     }
     
@@ -991,7 +1000,7 @@ function App() {
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                     <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                      {prices[`${nft['Contract Hash']}-${nft['TokenID Start']}`] || 'N/A'}
+                      {nft['Type'] === 'Unique' ? 'Unique' : (prices[`${nft['Contract Hash']}-${nft['TokenID Start']}`] || 'N/A')}
                     </Typography>
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
