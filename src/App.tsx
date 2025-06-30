@@ -25,7 +25,11 @@ import {
   Search as SearchIcon,
   Brightness4 as Brightness4Icon,
   Brightness7 as Brightness7Icon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Analytics as AnalyticsIcon,
+  TrendingUp as TrendingUpIcon,
+  Collections as CollectionsIcon,
+  CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Papa from 'papaparse';
@@ -73,9 +77,32 @@ function App() {
   const [showFilters, setShowFilters] = useState(false);
   const [isPriceLoading, setIsPriceLoading] = useState<boolean>(false);
   const [prices, setPrices] = useState<Record<string, string>>({});
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
+  const [darkMode, setDarkMode] = useState<boolean>(false);
+  
+  // Enhanced Price Features & Analytics
+  const [portfolioValue, setPortfolioValue] = useState<number>(0);
+  const [priceHistory, setPriceHistory] = useState<Record<string, Array<{date: string, price: number}>>>({});
+  const [showAnalytics, setShowAnalytics] = useState<boolean>(false);
+  const [priceAlerts, setPriceAlerts] = useState<Record<string, {targetPrice: number, isAbove: boolean}>>({});
+  const [showPriceAlerts, setShowPriceAlerts] = useState<boolean>(false);
+  const [collectionStats, setCollectionStats] = useState<{
+    totalPieces: number;
+    uniquePieces: number;
+    editionPieces: number;
+    generativePieces: number;
+    platforms: Record<string, number>;
+    years: Record<string, number>;
+    totalValue: number;
+    averagePrice: number;
+  }>({
+    totalPieces: 0,
+    uniquePieces: 0,
+    editionPieces: 0,
+    generativePieces: 0,
+    platforms: {},
+    years: {},
+    totalValue: 0,
+    averagePrice: 0
   });
 
   useEffect(() => {
@@ -538,6 +565,204 @@ function App() {
     // return () => clearInterval(interval);
   }, [fetchAllPrices]);
 
+  // Calculate collection analytics
+  const calculateAnalytics = useCallback(() => {
+    const stats = {
+      totalPieces: nfts.length,
+      uniquePieces: nfts.filter(nft => nft['Type'] === 'Unique').length,
+      editionPieces: nfts.filter(nft => nft['Type'] === 'Edition').length,
+      generativePieces: nfts.filter(nft => nft['Type'] === 'Generative').length,
+      platforms: {} as Record<string, number>,
+      years: {} as Record<string, number>,
+      totalValue: 0,
+      averagePrice: 0
+    };
+
+    // Calculate platform distribution
+    nfts.forEach(nft => {
+      const platform = nft['Platform'];
+      stats.platforms[platform] = (stats.platforms[platform] || 0) + 1;
+    });
+
+    // Calculate year distribution
+    nfts.forEach(nft => {
+      const year = nft['Mint Date']?.split('/')[2] || 'Unknown';
+      stats.years[year] = (stats.years[year] || 0) + 1;
+    });
+
+    // Calculate portfolio value
+    let totalValue = 0;
+    let priceCount = 0;
+    
+    nfts.forEach(nft => {
+      const nftKey = `${nft['Contract Hash']}-${nft['TokenID Start']}`;
+      const priceStr = prices[nftKey];
+      
+      if (priceStr && priceStr !== 'Not Listed' && priceStr !== 'Error') {
+        const priceMatch = priceStr.match(/(\d+\.?\d*)\s*ETH/);
+        if (priceMatch) {
+          const price = parseFloat(priceMatch[1]);
+          totalValue += price;
+          priceCount++;
+        }
+      }
+    });
+
+    stats.totalValue = totalValue;
+    stats.averagePrice = priceCount > 0 ? totalValue / priceCount : 0;
+
+    setCollectionStats(stats);
+    setPortfolioValue(totalValue);
+  }, [nfts, prices]);
+
+  // Update analytics when prices change
+  useEffect(() => {
+    calculateAnalytics();
+  }, [calculateAnalytics]);
+
+  // Price Alert Functions
+  const addPriceAlert = (nftKey: string, targetPrice: number, isAbove: boolean) => {
+    setPriceAlerts(prev => ({
+      ...prev,
+      [nftKey]: { targetPrice, isAbove }
+    }));
+  };
+
+  const removePriceAlert = (nftKey: string) => {
+    setPriceAlerts(prev => {
+      const newAlerts = { ...prev };
+      delete newAlerts[nftKey];
+      return newAlerts;
+    });
+  };
+
+  const checkPriceAlerts = useCallback(() => {
+    Object.entries(priceAlerts).forEach(([nftKey, alert]) => {
+      const currentPriceStr = prices[nftKey];
+      if (currentPriceStr && currentPriceStr !== 'Not Listed' && currentPriceStr !== 'Error') {
+        const priceMatch = currentPriceStr.match(/(\d+\.?\d*)\s*ETH/);
+        if (priceMatch) {
+          const currentPrice = parseFloat(priceMatch[1]);
+          const shouldTrigger = alert.isAbove ? 
+            currentPrice >= alert.targetPrice : 
+            currentPrice <= alert.targetPrice;
+          
+          if (shouldTrigger) {
+            // In a real app, you'd show a notification here
+            console.log(`Price alert triggered for ${nftKey}: ${currentPrice} ETH ${alert.isAbove ? '>=' : '<='} ${alert.targetPrice} ETH`);
+          }
+        }
+      }
+    });
+  }, [priceAlerts, prices]);
+
+  // Check price alerts when prices update
+  useEffect(() => {
+    checkPriceAlerts();
+  }, [checkPriceAlerts]);
+
+  // Analytics Component
+  const AnalyticsPanel = () => (
+    <Box sx={{ 
+      mb: 3, 
+      p: 3, 
+      bgcolor: 'background.paper', 
+      borderRadius: 2, 
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      border: '1px solid',
+      borderColor: 'divider'
+    }}>
+      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <AnalyticsIcon />
+        Collection Analytics
+      </Typography>
+      
+      <Grid container spacing={3}>
+        {/* Portfolio Value */}
+        <Grid item xs={12} md={3}>
+          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'primary.main', color: 'white', borderRadius: 1 }}>
+            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+              {portfolioValue.toFixed(2)} ETH
+            </Typography>
+            <Typography variant="body2">Total Portfolio Value</Typography>
+          </Box>
+        </Grid>
+
+        {/* Collection Stats */}
+        <Grid item xs={12} md={3}>
+          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'secondary.main', color: 'white', borderRadius: 1 }}>
+            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+              {collectionStats.totalPieces}
+            </Typography>
+            <Typography variant="body2">Total Pieces</Typography>
+          </Box>
+        </Grid>
+
+        <Grid item xs={12} md={3}>
+          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'success.main', color: 'white', borderRadius: 1 }}>
+            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+              {collectionStats.uniquePieces}
+            </Typography>
+            <Typography variant="body2">Unique Pieces</Typography>
+          </Box>
+        </Grid>
+
+        <Grid item xs={12} md={3}>
+          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+              {collectionStats.averagePrice.toFixed(2)} ETH
+            </Typography>
+            <Typography variant="body2">Average Price</Typography>
+          </Box>
+        </Grid>
+
+        {/* Platform Distribution */}
+        <Grid item xs={12} md={6}>
+          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CollectionsIcon />
+            Platform Distribution
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {Object.entries(collectionStats.platforms)
+              .sort(([,a], [,b]) => b - a)
+              .slice(0, 8)
+              .map(([platform, count]) => (
+                <Chip
+                  key={platform}
+                  label={`${platform}: ${count}`}
+                  variant="outlined"
+                  size="small"
+                  sx={{ mb: 1 }}
+                />
+              ))}
+          </Box>
+        </Grid>
+
+        {/* Year Distribution */}
+        <Grid item xs={12} md={6}>
+          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CalendarIcon />
+            Year Distribution
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {Object.entries(collectionStats.years)
+              .sort(([a], [b]) => b.localeCompare(a))
+              .slice(0, 8)
+              .map(([year, count]) => (
+                <Chip
+                  key={year}
+                  label={`${year}: ${count}`}
+                  variant="outlined"
+                  size="small"
+                  sx={{ mb: 1 }}
+                />
+              ))}
+          </Box>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
@@ -650,6 +875,32 @@ function App() {
                       }}
                     >
                       <RefreshIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Toggle Analytics">
+                    <IconButton 
+                      onClick={() => setShowAnalytics(!showAnalytics)}
+                      sx={{ 
+                        color: showAnalytics ? '#1976d2' : darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                        '&:hover': {
+                          color: '#1976d2'
+                        }
+                      }}
+                    >
+                      <TrendingUpIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Price Alerts">
+                    <IconButton 
+                      onClick={() => setShowPriceAlerts(!showPriceAlerts)}
+                      sx={{ 
+                        color: showPriceAlerts ? '#1976d2' : darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                        '&:hover': {
+                          color: '#1976d2'
+                        }
+                      }}
+                    >
+                      <AnalyticsIcon />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -818,6 +1069,8 @@ function App() {
               />
             </Stack>
           </Box>
+
+          {showAnalytics && <AnalyticsPanel />}
         </Box>
 
         {viewMode === 'gallery' ? (
