@@ -593,13 +593,13 @@ function App() {
 
   // Set up periodic price refresh
   useEffect(() => {
-    // Initial price fetch - disabled to prevent flickering
-    // fetchAllPrices();
+    // Initial price fetch
+    fetchAllPrices();
 
-    // Set up interval for periodic updates - disabled to prevent flickering
-    // const interval = setInterval(fetchAllPrices, 5 * 60 * 1000); // Update every 5 minutes
+    // Set up interval for periodic updates
+    const interval = setInterval(fetchAllPrices, 5 * 60 * 1000); // Update every 5 minutes
 
-    // return () => clearInterval(interval);
+    return () => clearInterval(interval);
   }, [fetchAllPrices]);
 
   // Calculate collection analytics
@@ -1367,7 +1367,7 @@ function App() {
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
                     <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                      {prices[`${nft['Contract Hash']}-${nft['TokenID Start']}`] || 'N/A'}
+                      {prices[`${nft['Contract Hash']}-${nft['TokenID Start']}`] || (isPriceLoading ? 'Loading...' : 'N/A')}
                     </Typography>
                   </Grid>
                   <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
