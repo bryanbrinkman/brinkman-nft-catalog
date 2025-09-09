@@ -16,7 +16,12 @@ import {
   Tooltip,
   Link,
   Card,
-  CssBaseline
+  CssBaseline,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button
 } from '@mui/material';
 import { 
   FilterList as FilterIcon,
@@ -29,10 +34,15 @@ import {
   Analytics as AnalyticsIcon,
   TrendingUp as TrendingUpIcon,
   Collections as CollectionsIcon,
-  CalendarToday as CalendarIcon
+  CalendarToday as CalendarIcon,
+  Event as EventIcon,
+  OpenInNew as OpenInNewIcon
 } from '@mui/icons-material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Papa from 'papaparse';
+import { OpenSeaEvents } from './components/OpenSeaEvents';
+import { NFTDashboard } from './components/NFTDashboard';
+import { NFTEventButton } from './components/NFTEventButton';
 
 // Helper function to delay between API calls
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -105,6 +115,12 @@ function App() {
     averagePrice: 0
   });
 
+  // OpenSea API Integration State
+  const [selectedNFT, setSelectedNFT] = useState<NFT | null>(null);
+  const [showNFTDashboard, setShowNFTDashboard] = useState<boolean>(false);
+  const [showOpenSeaEvents, setShowOpenSeaEvents] = useState<boolean>(false);
+  const [selectedNFTForEvents, setSelectedNFTForEvents] = useState<NFT | null>(null);
+
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
@@ -127,7 +143,7 @@ function App() {
 
   useEffect(() => {
     // Load CSV data
-    fetch('./Brinkman NFT Catalog _062325.csv')
+    fetch('./Brinkman NFT Catalog - Sheet1 (17).csv')
       .then(response => response.text())
       .then(data => {
         Papa.parse(data, {
@@ -446,6 +462,27 @@ function App() {
     setCollaboratorFilter('');
     setSortField('Mint Date');
     setSortOrder('desc');
+  };
+
+  // OpenSea API Integration Functions
+  const handleNFTDashboardOpen = (nft: NFT) => {
+    setSelectedNFT(nft);
+    setShowNFTDashboard(true);
+  };
+
+  const handleNFTDashboardClose = () => {
+    setShowNFTDashboard(false);
+    setSelectedNFT(null);
+  };
+
+  const handleOpenSeaEventsOpen = (nft: NFT) => {
+    setSelectedNFTForEvents(nft);
+    setShowOpenSeaEvents(true);
+  };
+
+  const handleOpenSeaEventsClose = () => {
+    setShowOpenSeaEvents(false);
+    setSelectedNFTForEvents(null);
   };
 
   // Updated price fetching function using Alchemy API
@@ -1107,8 +1144,60 @@ function App() {
                             objectFit: 'cover'
                           }}
                         />
+                        {/* OpenSea Events Button Overlay */}
+                        {nft['Contract Hash'] && nft['TokenID Start'] && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              zIndex: 2,
+                              bgcolor: 'rgba(0,0,0,0.7)',
+                              borderRadius: '50%',
+                              p: 0.5
+                            }}
+                          >
+                            <NFTEventButton
+                              contractAddress={nft['Contract Hash']}
+                              tokenId={nft['TokenID Start']}
+                              nftTitle={nft['Artwork Title']}
+                            />
+                          </Box>
+                        )}
                       </Box>
                     </Link>
+                    {/* Card Actions */}
+                    <Box sx={{ p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', flex: 1 }}>
+                        {nft['Artwork Title']}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        {nft['Contract Hash'] && nft['TokenID Start'] && (
+                          <Tooltip title="View Market Data">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleNFTDashboardOpen(nft);
+                              }}
+                            >
+                              <TrendingUpIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="View on OpenSea">
+                          <IconButton
+                            size="small"
+                            href={nft.Link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <OpenInNewIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Box>
                   </Card>
                 </Grid>
               ))}
@@ -1214,6 +1303,9 @@ function App() {
                 <Grid item xs={1}>
                   <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Link</Typography>
                 </Grid>
+                <Grid item xs={1}>
+                  <Typography variant="subtitle2" sx={{ color: 'text.primary', fontWeight: 600 }}>Events</Typography>
+                </Grid>
               </Grid>
               
               {/* Data Rows */}
@@ -1295,10 +1387,76 @@ function App() {
                       </Link>
                     )}
                   </Grid>
+                  <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    {nft['Contract Hash'] && nft['TokenID Start'] ? (
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="View Market Data">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleNFTDashboardOpen(nft)}
+                          >
+                            <TrendingUpIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <NFTEventButton
+                          contractAddress={nft['Contract Hash']}
+                          tokenId={nft['TokenID Start']}
+                          nftTitle={nft['Artwork Title']}
+                        />
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        N/A
+                      </Typography>
+                    )}
+                  </Grid>
                 </Grid>
               ))}
             </Box>
           </Box>
+        )}
+
+        {/* OpenSea API Integration Dialogs */}
+        {selectedNFT && showNFTDashboard && (
+          <NFTDashboard
+            nft={selectedNFT}
+            onClose={handleNFTDashboardClose}
+          />
+        )}
+
+        {selectedNFTForEvents && showOpenSeaEvents && (
+          <Dialog
+            open={showOpenSeaEvents}
+            onClose={handleOpenSeaEventsClose}
+            maxWidth="md"
+            fullWidth
+          >
+            <DialogTitle>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">
+                  OpenSea Events - {selectedNFTForEvents['Artwork Title']}
+                </Typography>
+                <IconButton
+                  href={selectedNFTForEvents.Link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  size="small"
+                >
+                  <OpenInNewIcon />
+                </IconButton>
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <OpenSeaEvents
+                contractAddress={selectedNFTForEvents['Contract Hash']}
+                tokenId={selectedNFTForEvents['TokenID Start']}
+                nftTitle={selectedNFTForEvents['Artwork Title']}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleOpenSeaEventsClose}>Close</Button>
+            </DialogActions>
+          </Dialog>
         )}
       </Container>
     </ThemeProvider>
