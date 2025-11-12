@@ -116,13 +116,13 @@ function App() {
   }, [darkMode]);
 
   const theme = useMemo(() => createTheme({
-    palette: {
+  palette: {
       mode: darkMode ? 'dark' : 'light',
       background: {
         default: darkMode ? '#181a20' : '#f5f5f5',
         paper: darkMode ? '#23272f' : '#fff',
       },
-      primary: {
+    primary: {
         main: darkMode ? '#90caf9' : '#1976d2',
       },
     },
@@ -133,7 +133,7 @@ function App() {
 
   useEffect(() => {
     // Load CSV data
-    const csvUrl = `${process.env.PUBLIC_URL || ''}/Brinkman NFT Catalog - Sheet1 (19).csv`;
+    const csvUrl = `${process.env.PUBLIC_URL || ''}/Brinkman NFT Catalog - Sheet1 (20).csv`;
     fetch(csvUrl)
       .then(response => response.text())
       .then(data => {
