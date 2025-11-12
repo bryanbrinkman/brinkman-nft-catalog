@@ -49,6 +49,7 @@ interface NFT {
   'Platform': string;
   'Collection Name': string;
   'Collaborator/Special Type': string;
+  'Listed'?: string;
   'Link': string;
   'Contract Hash': string;
   'Token Type': string;
@@ -132,7 +133,8 @@ function App() {
 
   useEffect(() => {
     // Load CSV data
-    fetch('./Brinkman NFT Catalog - Sheet1 (17).csv')
+    const csvUrl = `${process.env.PUBLIC_URL || ''}/Brinkman NFT Catalog - Sheet1 (19).csv`;
+    fetch(csvUrl)
       .then(response => response.text())
       .then(data => {
         Papa.parse(data, {
