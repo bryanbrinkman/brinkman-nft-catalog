@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  Container, 
-  Grid, 
-  Typography, 
+import {
+  Container,
+  Grid,
+  Typography,
   TextField,
   Select,
   MenuItem,
@@ -21,9 +21,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button
+  Button,
+  Alert,
+  Snackbar
 } from '@mui/material';
-import { 
+import {
   FilterList as FilterIcon,
   ViewList as GridIcon,
   ViewComfy as GalleryIcon,
@@ -33,10 +35,28 @@ import {
   Refresh as RefreshIcon,
   Analytics as AnalyticsIcon,
   Collections as CollectionsIcon,
-  OpenInNew as OpenInNewIcon
+  OpenInNew as OpenInNewIcon,
+  Storage as StorageIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Papa from 'papaparse';
+
+// Import cache and validation utilities
+import {
+  cacheNFTData,
+  getCachedNFTData,
+  cachePriceData,
+  getCachedPriceData,
+  clearCache,
+  getCacheStats,
+  formatCacheSize
+} from './utils/cache';
+import {
+  validateNFTData,
+  sanitizeNFTData,
+  logValidationResults
+} from './utils/validation';
 
 // Helper function to delay between API calls
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -110,6 +130,12 @@ function App() {
     averagePrice: 0
   });
 
+  // Cache management state
+  const [cacheLoaded, setCacheLoaded] = useState<boolean>(false);
+  const [showCacheNotification, setShowCacheNotification] = useState<boolean>(false);
+  const [cacheNotificationMessage, setCacheNotificationMessage] = useState<string>('');
+  const [showCacheDialog, setShowCacheDialog] = useState<boolean>(false);
+
 
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
@@ -132,10 +158,30 @@ function App() {
   }), [darkMode]);
 
   useEffect(() => {
-    // Load CSV data
-    const csvUrl = `${process.env.PUBLIC_URL || ''}/Brinkman NFT Catalog - Sheet1 (20).csv`;
+    // Try to load from cache first
+    const cachedData = getCachedNFTData();
+
+    if (cachedData && cachedData.length > 0) {
+      console.log('📦 Loading NFT data from cache...');
+      setNfts(cachedData);
+      setFilteredNfts(cachedData);
+      setLoading(false);
+      setCacheLoaded(true);
+      setCacheNotificationMessage(`Loaded ${cachedData.length} NFTs from cache`);
+      setShowCacheNotification(true);
+      return;
+    }
+
+    // If no cache, load CSV data
+    console.log('🌐 Loading NFT data from CSV...');
+    const csvUrl = `${process.env.PUBLIC_URL || ''}/catalog.csv`;
     fetch(csvUrl)
-      .then(response => response.text())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch CSV: ${response.statusText}`);
+        }
+        return response.text();
+      })
       .then(data => {
         Papa.parse(data, {
           header: true,
@@ -144,11 +190,36 @@ function App() {
             return header || 'Artwork Title';
           },
           complete: (results) => {
-            setNfts(results.data as NFT[]);
-            setFilteredNfts(results.data as NFT[]);
+            console.log('✅ CSV parsed successfully');
+
+            // Validate the data
+            const validationResult = validateNFTData(results.data);
+            logValidationResults(validationResult);
+
+            // Sanitize data by removing invalid records
+            const cleanData = sanitizeNFTData(results.data);
+
+            // Save to cache
+            const cached = cacheNFTData(cleanData);
+
+            setNfts(cleanData);
+            setFilteredNfts(cleanData);
+            setLoading(false);
+
+            if (cached) {
+              setCacheNotificationMessage(`Loaded and cached ${cleanData.length} NFTs`);
+              setShowCacheNotification(true);
+            }
+          },
+          error: (error) => {
+            console.error('❌ Error parsing CSV:', error);
             setLoading(false);
           }
         });
+      })
+      .catch(error => {
+        console.error('❌ Error fetching CSV:', error);
+        setLoading(false);
       });
   }, []);
 
@@ -455,6 +526,16 @@ function App() {
     setSortOrder('desc');
   };
 
+  // Handle cache clearing
+  const handleClearCache = () => {
+    clearCache();
+    setCacheNotificationMessage('Cache cleared successfully');
+    setShowCacheNotification(true);
+    setShowCacheDialog(false);
+    // Reload the page to fetch fresh data
+    window.location.reload();
+  };
+
 
   // Updated price fetching function using Alchemy API
   const fetchOpenSeaPrice = useCallback(async (contractAddress: string, tokenId: string, isUnique: boolean = false): Promise<string> => {
@@ -526,17 +607,27 @@ function App() {
   // Function to fetch all prices
   const fetchAllPrices = useCallback(async () => {
     if (isPriceLoading) return; // Prevent multiple simultaneous updates
-    
+
+    // Try to load from cache first
+    const cachedPrices = getCachedPriceData();
+    if (cachedPrices && Object.keys(cachedPrices).length > 0) {
+      console.log('📦 Loading prices from cache...');
+      setPrices(cachedPrices);
+      setCacheNotificationMessage(`Loaded ${Object.keys(cachedPrices).length} prices from cache`);
+      setShowCacheNotification(true);
+      return;
+    }
+
     setIsPriceLoading(true);
-    console.log('Starting price fetch for', nfts.length, 'artworks');
-    
+    console.log('🌐 Fetching fresh prices for', nfts.length, 'artworks');
+
     const updatedPrices: Record<string, string> = {};
     let successCount = 0;
     let errorCount = 0;
 
     for (let i = 0; i < nfts.length; i++) {
       const nft = nfts[i];
-      
+
       if (nft['Contract Hash'] && nft['TokenID Start']) {
         try {
           const price = await fetchOpenSeaPrice(nft['Contract Hash'], nft['TokenID Start'], nft['Type'] === 'Unique');
@@ -555,10 +646,15 @@ function App() {
     }
 
     if (Object.keys(updatedPrices).length > 0) {
-      console.log(`Price update complete. Success: ${successCount}, Errors: ${errorCount}`);
-      setPrices(prev => ({ ...prev, ...updatedPrices }));
+      console.log(`✅ Price update complete. Success: ${successCount}, Errors: ${errorCount}`);
+      setPrices(updatedPrices);
+
+      // Cache the prices
+      cachePriceData(updatedPrices);
+      setCacheNotificationMessage(`Fetched and cached ${successCount} prices`);
+      setShowCacheNotification(true);
     }
-    
+
     setIsPriceLoading(false);
   }, [nfts, fetchOpenSeaPrice, isPriceLoading]);
 
@@ -899,9 +995,9 @@ function App() {
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Price Alerts">
-                    <IconButton 
+                    <IconButton
                       onClick={() => setShowPriceAlerts(!showPriceAlerts)}
-                      sx={{ 
+                      sx={{
                         color: showPriceAlerts ? '#1976d2' : darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)',
                         '&:hover': {
                           color: '#1976d2'
@@ -909,6 +1005,19 @@ function App() {
                       }}
                     >
                       <AnalyticsIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Cache Management">
+                    <IconButton
+                      onClick={() => setShowCacheDialog(true)}
+                      sx={{
+                        color: cacheLoaded ? '#4caf50' : darkMode ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                        '&:hover': {
+                          color: '#1976d2'
+                        }
+                      }}
+                    >
+                      <StorageIcon />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -1328,6 +1437,118 @@ function App() {
         )}
 
       </Container>
+
+      {/* Cache Notification Snackbar */}
+      <Snackbar
+        open={showCacheNotification}
+        autoHideDuration={4000}
+        onClose={() => setShowCacheNotification(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setShowCacheNotification(false)}
+          severity="success"
+          sx={{ width: '100%' }}
+        >
+          {cacheNotificationMessage}
+        </Alert>
+      </Snackbar>
+
+      {/* Cache Management Dialog */}
+      <Dialog
+        open={showCacheDialog}
+        onClose={() => setShowCacheDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <StorageIcon />
+            <Typography variant="h6">Cache Management</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {(() => {
+            const cacheStats = getCacheStats();
+            return (
+              <Box>
+                <Typography variant="body1" gutterBottom>
+                  LocalStorage caching improves load times by storing data locally in your browser.
+                </Typography>
+
+                <Box sx={{ mt: 3, mb: 2 }}>
+                  <Typography variant="h6" gutterBottom>Cache Status</Typography>
+
+                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                    <Grid item xs={6}>
+                      <Card sx={{ p: 2, bgcolor: cacheStats.hasNFTData ? 'success.light' : 'grey.200' }}>
+                        <Typography variant="caption" color="text.secondary">NFT Data</Typography>
+                        <Typography variant="h6">
+                          {cacheStats.hasNFTData ? '✓ Cached' : '✗ Not Cached'}
+                        </Typography>
+                        {cacheStats.nftDataAge && (
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(cacheStats.nftDataAge).toLocaleString()}
+                          </Typography>
+                        )}
+                      </Card>
+                    </Grid>
+
+                    <Grid item xs={6}>
+                      <Card sx={{ p: 2, bgcolor: cacheStats.hasPriceData ? 'success.light' : 'grey.200' }}>
+                        <Typography variant="caption" color="text.secondary">Price Data</Typography>
+                        <Typography variant="h6">
+                          {cacheStats.hasPriceData ? '✓ Cached' : '✗ Not Cached'}
+                        </Typography>
+                        {cacheStats.priceDataAge && (
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(cacheStats.priceDataAge).toLocaleString()}
+                          </Typography>
+                        )}
+                      </Card>
+                    </Grid>
+                  </Grid>
+
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Total cache size: {formatCacheSize(cacheStats.totalSize)}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  <Typography variant="body2">
+                    <strong>Cache Expiration:</strong>
+                  </Typography>
+                  <Typography variant="body2">
+                    • NFT Data: 24 hours
+                  </Typography>
+                  <Typography variant="body2">
+                    • Price Data: 1 hour
+                  </Typography>
+                </Alert>
+
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  Clearing the cache will remove all stored data and reload the page to fetch fresh data from the server.
+                </Alert>
+              </Box>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCacheDialog(false)}>
+            Close
+          </Button>
+          <Button
+            onClick={handleClearCache}
+            color="error"
+            startIcon={<DeleteIcon />}
+            variant="outlined"
+          >
+            Clear Cache
+          </Button>
+        </DialogActions>
+      </Dialog>
     </ThemeProvider>
   );
 }
