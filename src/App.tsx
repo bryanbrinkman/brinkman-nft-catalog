@@ -211,7 +211,7 @@ function App() {
               setShowCacheNotification(true);
             }
           },
-          error: (error) => {
+          error: (error: Error) => {
             console.error('❌ Error parsing CSV:', error);
             setLoading(false);
           }
